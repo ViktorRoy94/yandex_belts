@@ -1,0 +1,25 @@
+Add 1-1- t
+Add 1a-1-1aaa event1
+Add 1-1-1aaa event1
+Add 0-1-2 event1
+Add 1--1-1 event1
+Add 1---1-1 event1
+Add 1-+1-+1 event1
+Add 1-1-0 event1
+Add 1-1-1 event1
+Add 1-1-32 event1
+Add 1-1--1 event1
+Add 1-1-01 event1
+Add 1-1-031 event1
+Add 1-1-032 event1
+
+Print
+
+Add 0-1-2 event1
+Add 1-2-3 event2
+Find 0-1-2
+
+Del 0-1-2
+Print
+Del 1-2-3 event2
+Del 1-2-3 event2

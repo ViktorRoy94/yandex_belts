@@ -6,8 +6,10 @@
 
 
 int main() {
-//    std::ifstream in("tests/set_synonyms_test_1.txt");
-//    std::cin.rdbuf(in.rdbuf());
+#ifdef DEBUG
+    std::ifstream in("tests/set_synonyms_test_1.txt");
+    std::cin.rdbuf(in.rdbuf());
+#endif
 
     std::map<std::string, std::set<std::string>> dict;
 

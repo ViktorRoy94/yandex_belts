@@ -6,8 +6,10 @@
 
 
 int main() {
-//    std::ifstream in("tests/map_bus_stops_1_test_1.txt");
-//    std::cin.rdbuf(in.rdbuf());
+#ifdef DEBUG
+    std::ifstream in("tests/map_bus_stops_1_test_1.txt");
+    std::cin.rdbuf(in.rdbuf());
+#endif
 
     std::map<std::string, std::vector<std::string>> buses_to_stop;
     std::map<std::string, std::vector<std::string>> stops_to_buses;
