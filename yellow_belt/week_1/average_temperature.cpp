@@ -4,7 +4,7 @@
 
 
 int main() {
-#ifdef DEBUG
+#ifdef LOCAL_BUILD
     std::ifstream in("tests/average_temperature.txt");
     std::cin.rdbuf(in.rdbuf());
 #endif

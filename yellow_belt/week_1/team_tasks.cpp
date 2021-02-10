@@ -3,7 +3,7 @@
 #include <string>
 #include <map>
 
-#ifdef DEBUG
+#ifdef LOCAL_BUILD
 enum class TaskStatus {
     NEW,
     IN_PROGRESS,
@@ -82,7 +82,7 @@ private:
     std::map<std::string, TasksInfo> data;
 };
 
-#ifdef DEBUG
+#ifdef LOCAL_BUILD
 void PrintTasksInfo(TasksInfo tasks_info) {
     for (const auto& it : tasks_info) {
         std::cout << tasks_info[it.first] << " ";

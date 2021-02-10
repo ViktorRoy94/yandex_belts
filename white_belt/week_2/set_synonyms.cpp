@@ -6,7 +6,7 @@
 
 
 int main() {
-#ifdef DEBUG
+#ifdef LOCAL_BUILD
     std::ifstream in("tests/set_synonyms_test_1.txt");
     std::cin.rdbuf(in.rdbuf());
 #endif

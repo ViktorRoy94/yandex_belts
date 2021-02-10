@@ -6,7 +6,7 @@
 
 
 int main() {
-#ifdef DEBUG
+#ifdef LOCAL_BUILD
     std::ifstream in("tests/map_bus_stops_2_test_1.txt");
     std::cin.rdbuf(in.rdbuf());
 #endif

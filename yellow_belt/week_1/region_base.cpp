@@ -5,7 +5,7 @@
 #include <set>
 #include <tuple>
 
-#ifdef DEBUG
+#ifdef LOCAL_BUILD
 enum class Lang {
     DE, FR, IT
 };
@@ -33,7 +33,7 @@ int FindMaxRepetitionCount(const std::vector<Region>& regions) {
     return result;
 }
 
-#ifdef DEBUG
+#ifdef LOCAL_BUILD
 int main() {
     std::cout << FindMaxRepetitionCount({
                 {

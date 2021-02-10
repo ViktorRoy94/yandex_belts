@@ -14,7 +14,7 @@ struct Student
 };
 
 int main() {
-#ifdef DEBUG
+#ifdef LOCAL_BUILD
     std::ifstream in("tests/fstream_students_list_test.txt");
     std::cin.rdbuf(in.rdbuf());
 #endif

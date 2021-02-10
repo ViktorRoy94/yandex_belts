@@ -112,7 +112,7 @@ Matrix operator+(const Matrix& left, const Matrix& right) {
 
 
 int main() {
-#ifdef DEBUG
+#ifdef LOCAL_BUILD
     std::ifstream in("tests/matrix_sum.txt");
     std::cin.rdbuf(in.rdbuf());
 #endif

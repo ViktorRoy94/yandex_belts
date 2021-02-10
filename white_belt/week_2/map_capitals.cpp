@@ -11,7 +11,7 @@ void PrintMap(const std::map<std::string, std::string>& m) {
 }
 
 int main() {
-#ifdef DEBUG
+#ifdef LOCAL_BUILD
     std::ifstream in("tests/map_capitals_test_2.txt");
     std::cin.rdbuf(in.rdbuf());
 #endif

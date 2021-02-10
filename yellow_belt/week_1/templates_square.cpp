@@ -40,7 +40,7 @@ T Sqr(const T& x) {
 }
 
 
-#ifdef DEBUG
+#ifdef LOCAL_BUILD
 int main() {
     std::vector<int> v = {1, 2, 3};
     std::cout << "vector:";

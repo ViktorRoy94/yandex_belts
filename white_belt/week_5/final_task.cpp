@@ -137,7 +137,7 @@ private:
 };
 
 int main() {
-#ifdef DEBUG
+#ifdef LOCAL_BUILD
     std::ifstream in("tests/input.txt");
     std::cin.rdbuf(in.rdbuf());
 #endif

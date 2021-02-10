@@ -14,7 +14,7 @@ V& GetRefStrict(std::map<K, V>& a, K key) {
 }
 
 
-#ifdef DEBUG
+#ifdef LOCAL_BUILD
 int main() {
     std::map<int, std::string> m = {{0, "value"}};
     std::string& item = GetRefStrict(m, 0);

@@ -2,27 +2,56 @@ cmake_minimum_required(VERSION 2.8.12)
 
 project(yandex_belts)
 
-set(CMAKE_INCLUDE_CURRENT_DIR ON)
+################################################################################
+# Input arguments
+################################################################################
 
-# Require C++ 17
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED on)
+set(TARGET_COURSE "yellow" CACHE STRING "Сhoose course color: white, yellow or all")
+set_property(CACHE TARGET_COURSE PROPERTY STRINGS "white" "yellow" "all")
+set(TARGET_WEEK "week_1" CACHE STRING "Сhoose current week number: week_1, week_2 etc. or all")
+set_property(CACHE TARGET_WEEK PROPERTY STRINGS "week_1" "week_2" "week_3"
+                                                "week_4" "week_5" "week_6" "all")
 
-if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-    # enable warnings and treat warnings as errors
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror -Wall")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated -Wno-reorder")
+message(STATUS "*** Input arguments ***")
+message(STATUS "  TARGET_COURSE: ${TARGET_COURSE}")
+message(STATUS "  TARGET_WEEK: ${TARGET_WEEK}")
 
-    if ("${CMAKE_BUILD_TYPE}" MATCHES "(Debug|DEBUG|debug)")
-        message(STATUS "  Setting Debug specific options...")
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g3 -ggdb")
-        add_definitions(-DDEBUG)
-    endif()
+################################################################################
+# Checking input arguments
+################################################################################
+
+if (NOT "${TARGET_COURSE}" MATCHES "(white|yellow|all)")
+    message(FATAL_ERROR "TARGET_COURSE should be white, yellow or all!")
 endif()
 
+################################################################################
+# Setting Build Options
+################################################################################
+
+message(STATUS "*** Build options ***")
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED on)
+if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror -Wall")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated -Wno-reorder")
+endif()
 message(STATUS "  CMAKE_CXX_FLAGS: ${CMAKE_CXX_FLAGS}")
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
-add_subdirectory ("white_belt")
-add_subdirectory ("yellow_belt")
+################################################################################
+# Setting global definitions
+################################################################################
+
+add_definitions(-DLOCAL_BUILD)
+
+################################################################################
+# Add Projects
+################################################################################
+
+if ("${TARGET_COURSE}" MATCHES "all")
+    add_subdirectory ("white_belt")
+    add_subdirectory ("yellow_belt")
+else()
+    add_subdirectory ("${TARGET_COURSE}_belt")
+endif()
