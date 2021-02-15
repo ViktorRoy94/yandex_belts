@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8.12)
+cmake_minimum_required(VERSION 3.2)
 
 project(yellow_belt)
 
@@ -6,8 +6,8 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${PROJECT_N
 
 if ("${TARGET_WEEK}" MATCHES "all")
     add_subdirectory ("week_1")
-#    add_subdirectory ("week_2")
-    #add_subdirectory ("week_3")
+    add_subdirectory ("week_2")
+    add_subdirectory ("week_3")
     #add_subdirectory ("week_4")
     #add_subdirectory ("week_5")
     #add_subdirectory ("week_6")
