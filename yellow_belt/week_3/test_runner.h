@@ -101,9 +101,3 @@ public:
 private:
     int fail_count = 0;
 };
-
-struct FullName
-{
-    std::string first_name;
-    std::string last_name;
-};
