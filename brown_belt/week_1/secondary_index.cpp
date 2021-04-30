@@ -34,11 +34,6 @@ struct RecordHasher {
     }
 };
 
-//bool operator<(const Record& l, const Record& r) {
-//    return tie(l.id, l.title, l.user, l.timestamp, l.karma) <
-//           tie(r.id, r.title, r.user, r.timestamp, r.karma);
-//}
-
 // Реализуйте этот класс
 class Database {
 public:

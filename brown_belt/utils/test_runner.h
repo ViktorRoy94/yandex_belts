@@ -4,14 +4,13 @@
 #include <stdexcept>
 #include <iostream>
 #include <map>
+#include <unordered_map>
 #include <set>
 #include <string>
 #include <vector>
 
-using namespace std;
-
 template <class T>
-ostream& operator << (ostream& os, const vector<T>& s) {
+std::ostream& operator << (std::ostream& os, const std::vector<T>& s) {
     os << "{";
     bool first = true;
     for (const auto& x : s) {
@@ -25,7 +24,7 @@ ostream& operator << (ostream& os, const vector<T>& s) {
 }
 
 template <class T>
-ostream& operator << (ostream& os, const set<T>& s) {
+std::ostream& operator << (std::ostream& os, const std::set<T>& s) {
     os << "{";
     bool first = true;
     for (const auto& x : s) {
@@ -39,7 +38,21 @@ ostream& operator << (ostream& os, const set<T>& s) {
 }
 
 template <class K, class V>
-ostream& operator << (ostream& os, const map<K, V>& m) {
+std::ostream& operator << (std::ostream& os, const std::map<K, V>& m) {
+    os << "{";
+    bool first = true;
+    for (const auto& kv : m) {
+        if (!first) {
+            os << ", ";
+        }
+        first = false;
+        os << kv.first << ": " << kv.second;
+    }
+    return os << "}";
+}
+
+template <class K, class V>
+std::ostream& operator << (std::ostream& os, const std::unordered_map<K, V>& m) {
     os << "{";
     bool first = true;
     for (const auto& kv : m) {
@@ -53,40 +66,40 @@ ostream& operator << (ostream& os, const map<K, V>& m) {
 }
 
 template<class T, class U>
-void AssertEqual(const T& t, const U& u, const string& hint = {}) {
+void AssertEqual(const T& t, const U& u, const std::string& hint = {}) {
     if (!(t == u)) {
-        ostringstream os;
+        std::ostringstream os;
         os << "Assertion failed: " << t << " != " << u;
         if (!hint.empty()) {
             os << " hint: " << hint;
         }
-        throw runtime_error(os.str());
+        throw std::runtime_error(os.str());
     }
 }
 
-inline void Assert(bool b, const string& hint) {
+inline void Assert(bool b, const std::string& hint) {
     AssertEqual(b, true, hint);
 }
 
 class TestRunner {
 public:
     template <class TestFunc>
-    void RunTest(TestFunc func, const string& test_name) {
+    void RunTest(TestFunc func, const std::string& test_name) {
         try {
             func();
-            cerr << test_name << " OK" << endl;
-        } catch (exception& e) {
+            std::cerr << test_name << " OK" << std::endl;
+        } catch (std::exception& e) {
             ++fail_count;
-            cerr << test_name << " fail: " << e.what() << endl;
+            std::cerr << test_name << " fail: " << e.what() << std::endl;
         } catch (...) {
             ++fail_count;
-            cerr << "Unknown exception caught" << endl;
+            std::cerr << "Unknown exception caught" << std::endl;
         }
     }
 
     ~TestRunner() {
         if (fail_count > 0) {
-            cerr << fail_count << " unit tests failed. Terminate" << endl;
+            std::cerr << fail_count << " unit tests failed. Terminate" << std::endl;
             exit(1);
         }
     }
@@ -96,7 +109,7 @@ private:
 };
 
 #define ASSERT_EQUAL(x, y) {                \
-    ostringstream assert_os;                \
+    std::ostringstream assert_os;                \
     assert_os << #x << " != " << #y << ", " \
       << __FILE__ << ":" << __LINE__;       \
     AssertEqual(x, y, assert_os.str());     \
