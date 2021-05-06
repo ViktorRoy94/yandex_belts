@@ -9,7 +9,7 @@ using namespace std::chrono;
 
 class LogDuration {
 public:
-    explicit LogDuration(const string& msg = "")
+    explicit LogDuration(const std::string& msg = "")
         : message(msg + ": ")
         , start(steady_clock::now())
     {
@@ -18,29 +18,29 @@ public:
     ~LogDuration() {
         auto finish = steady_clock::now();
         auto dur = finish - start;
-        cerr << message
+        std::cerr << message
              << duration_cast<milliseconds>(dur).count()
-             << " ms" << endl;
+             << " ms" << std::endl;
     }
 private:
-    string message;
+    std::string message;
     steady_clock::time_point start;
 };
 
 struct TotalDuration {
-    string message;
+    std::string message;
     steady_clock::duration value;
-    explicit TotalDuration(const string& msg = "")
+    explicit TotalDuration(const std::string& msg = "")
         : message(msg + ": ")
         , value(0)
     {
     }
     ~TotalDuration() {
-        ostringstream os;
+        std::ostringstream os;
         os << message
            << duration_cast<milliseconds>(value).count()
-           << " ms" << endl;
-        cerr << os.str();
+           << " ms" << std::endl;
+        std::cerr << os.str();
     }
 };
 
