@@ -46,6 +46,12 @@ bool isEmploed(const Person& person) {
 }
 
 void PrintStats(vector<Person> persons) {
+    // Преобразуем порядок людей к следующему:
+    //                  persons
+    //                 /      \
+    //          females        males
+    //         /       \     /      \
+    //      empl.  unempl. empl.   unempl.
     auto females_end = partition(begin(persons), end(persons), isFemale);
     auto employed_females_end = partition(begin(persons), females_end, isEmploed);
     auto employed_males_end = partition(females_end, end(persons), isEmploed);
