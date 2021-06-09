@@ -1,10 +1,37 @@
 #include "request.h"
 #include "test_runner.h"
+#include "profile.h"
 
 #include <fstream>
 
 using namespace std;
 using namespace Json;
+
+bool CompareResponseJsonStrings(std::string str1, std::string str2) {
+    istringstream input1(str1);
+    istringstream input2(str2);
+    Document doc1 = Load(input1);
+    Document doc2 = Load(input2);
+
+    const auto& arr1 = doc1.GetRoot().AsArray();
+    const auto& arr2 = doc2.GetRoot().AsArray();
+
+    bool result = arr1.size() == arr2.size();
+    if (!result) return result;
+    for (size_t i = 0; i < arr1.size(); i++) {
+        if (arr1[i].AsMap().count("items") == 0) {
+            result = result && CompareNodes(arr1[i], arr2[i]);
+        } else {
+            const auto& map1 = arr1[i].AsMap();
+            const auto& map2 = arr2[i].AsMap();
+            result = result && map1.at("request_id").AsInt() == map2.at("request_id").AsInt();
+            double time_diff = abs(map1.at("total_time").AsDouble() -
+                                   map2.at("total_time").AsDouble());
+            result = result && time_diff < 0.0001;
+        }
+    }
+    return result;
+}
 
 void TestAddBusRequestParseFrom() {
     {
@@ -201,12 +228,29 @@ void TestJson() {
     }
 }
 
+void TestJsonCompare() {
+    {
+        string input(R"({"int": 10, "double": 1823423.1231, "bool": true, "array": [1, 2, 3]})");
+        string input_changed_int(R"({"int": 9, "double": 1823423.1231, "bool": true, "array": [1, 2, 3]})");
+        string input_changed_double(R"({"int": 10, "double": 1823423.12, "bool": true, "array": [1, 2, 3]})");
+        string input_changed_bool(R"({"int": 10, "double": 1823423.1231, "bool": false, "array": [1, 2, 3]})");
+        string input_changed_map(R"({"int": 10, "double": 1823423.1231, "bool": true)");
+        string input_changed_array(R"({"int": 10, "double": 1823423.1231, "bool": true, "array": [10, 2, 3]})");
+        ASSERT( CompareJsonStrings(input, input));
+        ASSERT(!CompareJsonStrings(input, input_changed_int));
+        ASSERT(!CompareJsonStrings(input, input_changed_double));
+        ASSERT(!CompareJsonStrings(input, input_changed_bool));
+        ASSERT(!CompareJsonStrings(input, input_changed_map));
+        ASSERT(!CompareJsonStrings(input, input_changed_array));
+    }
+}
+
 void TestParseJsonRoutingSettings() {
     istringstream input(R"({"routing_settings": {"bus_wait_time": 6, "bus_velocity": 40}})");
     Node node = Load(input).GetRoot();
     RoutingSettings settings = ReadJsonRoutingSettings(node);
     ASSERT_EQUAL(settings.bus_wait_time, 6);
-    ASSERT_EQUAL(settings.bus_velocity, 40.0);
+    ASSERT(abs(settings.bus_velocity - 666.66666) < 0.0001);
 }
 
 void TestAddBusRequestParseFromJson() {
@@ -507,6 +551,10 @@ void TestParseJsonRequest() {
 void TestReadJsonRequests() {
     {
         istringstream input(R"({
+                                 "routing_settings": {
+                                      "bus_wait_time": 6,
+                                      "bus_velocity": 40
+                                   },
                                   "base_requests": [
                                     {
                                       "type": "Stop",
@@ -556,12 +604,13 @@ void TestReadJsonRequests() {
 
         Document doc = Load(input);
         const auto requests = ReadJsonRequests(doc.GetRoot());
-        ASSERT_EQUAL(requests.size(), 5u);
-        ASSERT_EQUAL(requests[0]->type, Request::Type::ADD_STOP);
+        ASSERT_EQUAL(requests.size(), 6u);
+        ASSERT_EQUAL(requests[0]->type, Request::Type::ADD_ROUTE_SETTINGS);
         ASSERT_EQUAL(requests[1]->type, Request::Type::ADD_STOP);
-        ASSERT_EQUAL(requests[2]->type, Request::Type::ADD_BUS);
-        ASSERT_EQUAL(requests[3]->type, Request::Type::BUS_INFO);
-        ASSERT_EQUAL(requests[4]->type, Request::Type::STOP_INFO);
+        ASSERT_EQUAL(requests[2]->type, Request::Type::ADD_STOP);
+        ASSERT_EQUAL(requests[3]->type, Request::Type::ADD_BUS);
+        ASSERT_EQUAL(requests[4]->type, Request::Type::BUS_INFO);
+        ASSERT_EQUAL(requests[5]->type, Request::Type::STOP_INFO);
     }
 }
 
@@ -727,8 +776,9 @@ void TestStopManager() {
 
         StopManager manager;
         manager.AddStop({"Tolstopaltsevo",       coord1, {{"Marushkino", 3900u}}});
-        manager.AddStop({"Marushkino",           coord2, {{"Rasskazovka", 9900u}}});
-        manager.AddStop({"Rasskazovka",          coord3, {}});
+        manager.AddStop({"Marushkino",           coord2, {{"Rasskazovka", 9900u},
+                                                          {"Tolstopaltsevo", 3900u}}});
+        manager.AddStop({"Rasskazovka",          coord3, {{"Marushkino", 9900u}}});
         size_t length = manager.ComputeRealLength(vector<string>({"Tolstopaltsevo",
                                                                   "Marushkino",
                                                                   "Rasskazovka",
@@ -736,6 +786,177 @@ void TestStopManager() {
                                                                   "Tolstopaltsevo"}));
         ASSERT(labs(length - 27600) < 1);
     }
+}
+
+void TestRouteManager() {
+    {
+        BusManager bus_manager;
+        bus_manager.AddBus({"297", {"Biryulyovo Zapadnoye",
+                                    "Biryulyovo Tovarnaya",
+                                    "Universam",
+                                    "Biryulyovo Zapadnoye"}, true});
+        bus_manager.AddBus({"635", {"Biryulyovo Tovarnaya",
+                                    "Universam",
+                                    "Prazhskaya"}, false});
+
+        StopManager stop_manager;
+        stop_manager.AddStop({"Biryulyovo Zapadnoye", {}, {{"Biryulyovo Tovarnaya", 2600u}}});
+        stop_manager.AddStop({"Universam", {}, {{"Prazhskaya", 4650u},
+                                                {"Biryulyovo Tovarnaya", 1380u},
+                                                {"Biryulyovo Zapadnoye", 2500u}}});
+        stop_manager.AddStop({"Biryulyovo Tovarnaya", {}, {{"Universam", 890u}}});
+        stop_manager.AddStop({"Prazhskaya", {}, {}});
+
+        RouteManager manager(bus_manager, stop_manager);
+        manager.UpdateRouteSettings(RoutingSettings(6, 40));
+        manager.Initialize();
+        {
+            Path path = {"Biryulyovo Zapadnoye", "Universam"};
+            auto route_items = manager.GetRoute(path);
+            ASSERT_EQUAL(manager.GetRouteTime(path), 11.235);
+            ASSERT_EQUAL(route_items.size(), 2u);
+        }
+        {
+            Path path = {"Biryulyovo Zapadnoye", "Prazhskaya"};
+            auto route_items = manager.GetRoute(path);
+            ASSERT_EQUAL(manager.GetRouteTime(path), 24.21);
+            ASSERT_EQUAL(route_items.size(), 4u);
+
+            WaitItem* wait_item_1 = dynamic_cast<WaitItem*>(route_items[0].get());
+            BusItem* bus_item_2 = dynamic_cast<BusItem*>(route_items[1].get());
+            WaitItem* wait_item_3 = dynamic_cast<WaitItem*>(route_items[2].get());
+            BusItem* bus_item_4 = dynamic_cast<BusItem*>(route_items[3].get());
+
+            ASSERT_EQUAL(*wait_item_1, WaitItem("Biryulyovo Zapadnoye", 6.0));
+            ASSERT_EQUAL(*bus_item_2, BusItem("297", 1, 3.9));
+            ASSERT_EQUAL(*wait_item_3, WaitItem("Biryulyovo Tovarnaya", 6.0));
+            ASSERT_EQUAL(*bus_item_4, BusItem("635", 2, 8.31));
+        }
+    }
+//    {
+//        BusManager bus_manager;
+//        bus_manager.AddBus({"297", {"Biryulyovo Zapadnoye",
+//                                    "Biryulyovo Tovarnaya",
+//                                    "Universam",
+//                                    "Biryusinka",
+//                                    "Apteka",
+//                                    "Biryulyovo Zapadnoye"}, true});
+//        bus_manager.AddBus({"635", {"Biryulyovo Tovarnaya",
+//                                    "Universam",
+//                                    "Biryusinka",
+//                                    "TETs 26",
+//                                    "Pokrovskaya",
+//                                    "Prazhskaya"}, false});
+//        bus_manager.AddBus({"828", {"Biryulyovo Zapadnoye",
+//                                    "TETs 26",
+//                                    "Biryusinka",
+//                                    "Universam",
+//                                    "Pokrovskaya",
+//                                    "Rossoshanskaya ulitsa"}, false});
+//        bus_manager.AddBus({"750", {"Tolstopaltsevo",
+//                                    "Rasskazovka"}, false});
+
+//        StopManager stop_manager;
+//        stop_manager.AddStop({"Biryulyovo Zapadnoye", {}, {{"Biryulyovo Tovarnaya", 2600u},
+//                                                           {"TETs 26", 1100u}}});
+//        stop_manager.AddStop({"Universam", {}, {{"Biryusinka", 760u},
+//                                                {"Biryulyovo Tovarnaya", 1380u},
+//                                                {"Pokrovskaya", 2460u}}});
+//        stop_manager.AddStop({"Biryulyovo Tovarnaya", {}, {{"Universam", 890u}}});
+//        stop_manager.AddStop({"Biryusinka", {}, {{"Apteka", 210u},
+//                                                 {"TETs 26", 400u}}});
+//        stop_manager.AddStop({"Apteka", {}, {{"Biryulyovo Zapadnoye", 1420u}}});
+//        stop_manager.AddStop({"TETs 26", {}, {{"Pokrovskaya", 2850u}}});
+//        stop_manager.AddStop({"Pokrovskaya", {}, {{"Rossoshanskaya ulitsa", 3140u}}});
+//        stop_manager.AddStop({"Rossoshanskaya ulitsa", {}, {{"Pokrovskaya", 3210u}}});
+//        stop_manager.AddStop({"Prazhskaya", {}, {{"Pokrovskaya", 2260u}}});
+//        stop_manager.AddStop({"Tolstopaltsevo", {}, {{"Rasskazovka", 13800u}}});
+//        stop_manager.AddStop({"Rasskazovka", {}, {}});
+
+//        RouteManager manager(bus_manager, stop_manager);
+//        manager.UpdateRouteSettings(RoutingSettings(2, 30));
+//        manager.Initialize();
+//        {
+//            Path path = {"Biryulyovo Zapadnoye", "Apteka"};
+//            ASSERT_EQUAL(manager.GetRouteTime(path), 7.42);
+//            auto route_items = manager.GetRoute(path);
+//            ASSERT_EQUAL(route_items.size(), 4u);
+//        }
+//        {
+//            Path path = {"Biryulyovo Zapadnoye", "Pokrovskaya"};
+//            auto route_items = manager.GetRoute(path);
+//            ASSERT_EQUAL(manager.GetRouteTime(path), 11.44);
+//            ASSERT_EQUAL(route_items.size(), 2u);
+//        }
+//        {
+//            Path path = {"Biryulyovo Tovarnaya", "Pokrovskaya"};
+//            auto route_items = manager.GetRoute(path);
+//            ASSERT_EQUAL(manager.GetRouteTime(path), 10.7);
+//            ASSERT_EQUAL(route_items.size(), 4u);
+//        }
+//        {
+//            Path path = {"Biryulyovo Tovarnaya", "Biryulyovo Zapadnoye"};
+//            auto route_items = manager.GetRoute(path);
+//            ASSERT_EQUAL(manager.GetRouteTime(path), 8.56);
+//            ASSERT_EQUAL(route_items.size(), 2u);
+//        }
+//        {
+//            Path path = {"Biryulyovo Tovarnaya", "Prazhskaya"};
+//            auto route_items = manager.GetRoute(path);
+//            ASSERT_EQUAL(manager.GetRouteTime(path), 16.32);
+//            ASSERT_EQUAL(route_items.size(), 2u);
+//        }
+//        {
+//            Path path = {"Apteka", "Biryulyovo Tovarnaya"};
+//            auto route_items = manager.GetRoute(path);
+//            ASSERT_EQUAL(manager.GetRouteTime(path), 12.04);
+//            ASSERT_EQUAL(route_items.size(), 4u);
+//        }
+//        {
+//            Path path = {"Biryulyovo Zapadnoye", "Tolstopaltsevo"};
+//            auto route_items = manager.GetRoute(path);
+//            ASSERT_EQUAL(route_items.size(), 0u);
+//        }
+//    }
+//    {
+//        BusManager bus_manager;
+//        bus_manager.AddBus({"289", {"Zagorye",
+//                                    "Lipetskaya ulitsa 46",
+//                                    "Lipetskaya ulitsa 40",
+//                                    "Lipetskaya ulitsa 40",
+//                                    "Lipetskaya ulitsa 46",
+//                                    "Moskvorechye",
+//                                    "Zagorye"}, true});
+//        StopManager stop_manager;
+//        stop_manager.AddStop({"Zagorye", {}, {{"Lipetskaya ulitsa 46", 230u}}});
+//        stop_manager.AddStop({"Lipetskaya ulitsa 46", {}, {{"Lipetskaya ulitsa 40", 390u},
+//                                                           {"Moskvorechye", 12400u}}});
+//        stop_manager.AddStop({"Lipetskaya ulitsa 40", {}, {{"Lipetskaya ulitsa 40", 1090u},
+//                                                           {"Lipetskaya ulitsa 46", 380u}}});
+//        stop_manager.AddStop({"Moskvorechye", {}, {{"Zagorye", 10000u}}});
+
+//        RouteManager manager(bus_manager, stop_manager);
+//        manager.UpdateRouteSettings(RoutingSettings(2, 30));
+//        manager.Initialize();
+//        {
+//            Path path = {"Zagorye", "Moskvorechye"};
+//            auto route_items = manager.GetRoute(path);
+//            ASSERT_EQUAL(manager.GetRouteTime(path), 29.26);
+//            ASSERT_EQUAL(route_items.size(), 4u);
+//        }
+//        {
+//            Path path = {"Moskvorechye", "Zagorye"};
+//            auto route_items = manager.GetRoute(path);
+//            ASSERT_EQUAL(manager.GetRouteTime(path), 22);
+//            ASSERT_EQUAL(route_items.size(), 2u);
+//        }
+//        {
+//            Path path = {"Lipetskaya ulitsa 40", "Lipetskaya ulitsa 40"};
+//            auto route_items = manager.GetRoute(path);
+//            ASSERT_EQUAL(manager.GetRouteTime(path), 0);
+//            ASSERT_EQUAL(route_items.size(), 0u);
+//        }
+//    }
 }
 
 void TestPipeline() {
@@ -765,7 +986,7 @@ void TestPipeline() {
     ASSERT_EQUAL(update_requests.size(), 13u);
     ASSERT_EQUAL(read_requests.size(), 6u);
 
-    TransportManager manager;
+    Server manager;
     vector<ResponsePtr> update_responses = ProcessRequests(manager, update_requests);
     vector<ResponsePtr> read_responses = ProcessRequests(manager, read_requests);
     ASSERT_EQUAL(update_responses.size(), 0u);
@@ -791,7 +1012,7 @@ void TestJsonPipeline() {
     const auto requests = ReadJsonRequests(doc.GetRoot());
     ASSERT_EQUAL(requests.size(), 19u);
 
-    TransportManager manager;
+    Server manager;
     vector<ResponsePtr> responses = ProcessRequests(manager, requests);
     ASSERT_EQUAL(responses.size(), 6u);
 
@@ -807,17 +1028,16 @@ void TestJsonPipelineE_1() {
     getline(result, answer);
 
     Document doc = Load(input);
-    RoutingSettings settings = ReadJsonRoutingSettings(doc.GetRoot());
     const auto requests = ReadJsonRequests(doc.GetRoot());
-    ASSERT_EQUAL(requests.size(), 11u);
+    ASSERT_EQUAL(requests.size(), 12u);
 
-    TransportManager manager(move(settings));
+    Server manager;
     vector<ResponsePtr> responses = ProcessRequests(manager, requests);
     ASSERT_EQUAL(responses.size(), 5u);
 
     ostringstream output;
     PrintResponcesInJsonFormat(responses, output);
-    ASSERT_EQUAL(output.str(), answer);
+    ASSERT(CompareResponseJsonStrings(output.str(), answer));
 }
 
 void TestJsonPipelineE_2() {
@@ -827,17 +1047,17 @@ void TestJsonPipelineE_2() {
     getline(result, answer);
 
     Document doc = Load(input);
-    RoutingSettings settings = ReadJsonRoutingSettings(doc.GetRoot());
     const auto requests = ReadJsonRequests(doc.GetRoot());
-    ASSERT_EQUAL(requests.size(), 26u);
+    ASSERT_EQUAL(requests.size(), 27u);
 
-    TransportManager manager(move(settings));
+    Server manager;
     vector<ResponsePtr> responses = ProcessRequests(manager, requests);
     ASSERT_EQUAL(responses.size(), 11u);
 
     ostringstream output;
     PrintResponcesInJsonFormat(responses, output);
-    ASSERT_EQUAL(output.str(), answer);
+    ASSERT(CompareResponseJsonStrings(output.str(), answer));
+//    ASSERT_EQUAL(output.str(), answer);
 }
 
 void TestJsonPipelineE_3() {
@@ -847,17 +1067,17 @@ void TestJsonPipelineE_3() {
     getline(result, answer);
 
     Document doc = Load(input);
-    RoutingSettings settings = ReadJsonRoutingSettings(doc.GetRoot());
     const auto requests = ReadJsonRequests(doc.GetRoot());
-    ASSERT_EQUAL(requests.size(), 9u);
+    ASSERT_EQUAL(requests.size(), 10u);
 
-    TransportManager manager(move(settings));
+    Server manager;
     vector<ResponsePtr> responses = ProcessRequests(manager, requests);
     ASSERT_EQUAL(responses.size(), 4u);
 
     ostringstream output;
     PrintResponcesInJsonFormat(responses, output);
-    ASSERT_EQUAL(output.str(), answer);
+    ASSERT(CompareResponseJsonStrings(output.str(), answer));
+//    ASSERT_EQUAL(output.str(), answer);
 }
 
 void TestJsonPipelineE_4() {
@@ -867,17 +1087,25 @@ void TestJsonPipelineE_4() {
     getline(result, answer);
 
     Document doc = Load(input);
-    RoutingSettings settings = ReadJsonRoutingSettings(doc.GetRoot());
-    const auto requests = ReadJsonRequests(doc.GetRoot());
-    ASSERT_EQUAL(requests.size(), 2200u);
+    vector<RequestPtr> requests;
+    {
+        LOG_DURATION("TestJsonPipelineE_4 ReadRequests");
+        requests = ReadJsonRequests(doc.GetRoot());
+        ASSERT_EQUAL(requests.size(), 2201u);
+    }
 
-    TransportManager manager(move(settings));
-    vector<ResponsePtr> responses = ProcessRequests(manager, requests);
-    ASSERT_EQUAL(responses.size(), 2000u);
+    vector<ResponsePtr> responses;
+    {
+        LOG_DURATION("TestJsonPipelineE_4 ProcessRequests");
+        Server manager;
+        vector<ResponsePtr> responses = ProcessRequests(manager, requests);
+        ASSERT_EQUAL(responses.size(), 2000u);
+    }
 
     ostringstream output;
     PrintResponcesInJsonFormat(responses, output);
-    ASSERT_EQUAL(output.str(), answer);
+    ASSERT(CompareResponseJsonStrings(output.str(), answer));
+//    ASSERT_EQUAL(output.str(), answer);
 }
 
 int main() {
@@ -892,6 +1120,7 @@ int main() {
     RUN_TEST(tr, TestPrintResponse);
 
     RUN_TEST(tr, TestJson);
+    RUN_TEST(tr, TestJsonCompare);
     RUN_TEST(tr, TestParseJsonRoutingSettings);
     RUN_TEST(tr, TestAddBusRequestParseFromJson);
     RUN_TEST(tr, TestAddStopRequestParseFromJson);
@@ -909,6 +1138,7 @@ int main() {
     RUN_TEST(tr, TestLengthBetweenCoords);
     RUN_TEST(tr, TestBusManager);
     RUN_TEST(tr, TestStopManager);
+    RUN_TEST(tr, TestRouteManager);
 
     RUN_TEST(tr, TestPipeline);
     RUN_TEST(tr, TestJsonPipeline);

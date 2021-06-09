@@ -30,7 +30,7 @@ private:
     std::unordered_map<std::string, Coordinates> stops_;
 };
 
-class TransportManager
+class Server
 {
 public:
     void AddBus(std::string bus_name, std::vector<std::string> stop_names, bool is_circle_path);

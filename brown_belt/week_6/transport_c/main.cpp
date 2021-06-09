@@ -280,7 +280,7 @@ void TestPipeline() {
     ASSERT_EQUAL(update_requests.size(), 13u);
     ASSERT_EQUAL(read_requests.size(), 6u);
 
-    TransportManager manager;
+    Server manager;
     vector<ResponsePtr> update_responses = ProcessRequests(manager, update_requests);
     vector<ResponsePtr> read_responses = ProcessRequests(manager, read_requests);
     ASSERT_EQUAL(update_responses.size(), 0u);

@@ -705,7 +705,7 @@ void TestPipeline() {
     ASSERT_EQUAL(update_requests.size(), 13u);
     ASSERT_EQUAL(read_requests.size(), 6u);
 
-    TransportManager manager;
+    Server manager;
     vector<ResponsePtr> update_responses = ProcessRequests(manager, update_requests);
     vector<ResponsePtr> read_responses = ProcessRequests(manager, read_requests);
     ASSERT_EQUAL(update_responses.size(), 0u);
@@ -884,7 +884,7 @@ void TestJsonPipeline() {
     const auto requests = ReadJsonRequests(input);
     ASSERT_EQUAL(requests.size(), 19u);
 
-    TransportManager manager;
+    Server manager;
     vector<ResponsePtr> responses = ProcessRequests(manager, requests);
     ASSERT_EQUAL(responses.size(), 6u);
 

@@ -31,6 +31,23 @@ struct Edge {
 };
 
 template <typename Weight>
+bool operator==(const Edge<Weight>& lhs, const Edge<Weight>& rhs) {
+    return std::tie(lhs.from, lhs.to, lhs.weight) ==
+           std::tie(rhs.from, rhs.to, rhs.weight);
+}
+
+template <typename Weight>
+struct EdgeHasher {
+    size_t operator()(const Edge<Weight>& a) const {
+        size_t coef = 279388451;
+        std::hash<VertexId> ihash;
+        return coef * coef * ihash(a.from) +
+               coef * ihash(a.to) +
+               static_cast<int>(a.weight);
+    }
+};
+
+template <typename Weight>
 class DirectedWeightedGraph {
 private:
     using IncidenceList = std::vector<EdgeId>;

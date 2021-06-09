@@ -32,7 +32,7 @@ void AddBusRequest::ParseFrom(string_view input) {
         stops.emplace_back(string(stop));
     }
 }
-void AddBusRequest::Process(TransportManager& manager) const {
+void AddBusRequest::Process(Server& manager) const {
     manager.AddBus(move(bus_name), move(stops), is_circle_path);
 }
 
@@ -42,7 +42,7 @@ void AddStopRequest::ParseFrom(string_view input) {
     coords.latitude = ConvertToDouble(ReadToken(input, ","));
     coords.longitude = ConvertToDouble(ReadToken(input));
 }
-void AddStopRequest::Process(TransportManager& manager) const {
+void AddStopRequest::Process(Server& manager) const {
     manager.AddStop(move(stop_name), move(coords));
 }
 
@@ -50,7 +50,7 @@ void BusInfoRequest::ParseFrom(string_view input) {
     ReadToken(input);
     bus_name = Rstrip(input);
 }
-ResponsePtr BusInfoRequest::Process(const TransportManager& manager) const {
+ResponsePtr BusInfoRequest::Process(const Server& manager) const {
     return manager.BusInfo(move(bus_name));
 }
 
@@ -58,7 +58,7 @@ void StopInfoRequest::ParseFrom(string_view input) {
     ReadToken(input);
     stop_name = Rstrip(input);
 }
-ResponsePtr StopInfoRequest::Process(const TransportManager& manager) const {
+ResponsePtr StopInfoRequest::Process(const Server& manager) const {
     return manager.StopInfo(move(stop_name));
 }
 
@@ -110,7 +110,7 @@ vector<RequestPtr> ReadRequests(istream& in_stream) {
     return requests;
 }
 
-vector<ResponsePtr> ProcessRequests(TransportManager& manager, const vector<RequestPtr>& requests) {
+vector<ResponsePtr> ProcessRequests(Server& manager, const vector<RequestPtr>& requests) {
     vector<ResponsePtr> responses;
     for (const auto& request_holder : requests) {
         try {
@@ -120,15 +120,6 @@ vector<ResponsePtr> ProcessRequests(TransportManager& manager, const vector<Requ
             const auto& request = dynamic_cast<const UpdateRequest&>(*request_holder);
             request.Process(manager);
         }
-
-
-//        if (request_holder->type == Request::Type::BUS_INFO) {
-//            const auto& request = static_cast<const BusInfoRequest&>(*request_holder);
-//            responses.push_back(request.Process(manager));
-//        } else {
-//            const auto& request = static_cast<const UpdateRequest&>(*request_holder);
-//            request.Process(manager);
-//        }
     }
     return responses;
 }

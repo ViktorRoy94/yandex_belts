@@ -53,4 +53,7 @@ private:
 
 Document Load(std::istream& input);
 
+bool CompareNodes(const Node& node1, const Node& node2);
+bool CompareJsonStrings(std::string str1, std::string str2);
+
 }

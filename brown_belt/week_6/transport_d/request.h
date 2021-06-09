@@ -35,12 +35,12 @@ struct Request {
 
 struct ReadRequest : Request {
     using Request::Request;
-    virtual ResponsePtr Process(const TransportManager& manager) const = 0;
+    virtual ResponsePtr Process(const Server& manager) const = 0;
 };
 
 struct UpdateRequest : Request {
     using Request::Request;
-    virtual void Process(TransportManager& manager) const = 0;
+    virtual void Process(Server& manager) const = 0;
 };
 
 struct AddBusRequest : UpdateRequest {
@@ -48,7 +48,7 @@ struct AddBusRequest : UpdateRequest {
     void ParseFrom(std::string_view input) override;
     void ParseFromJson(const Json::Node& node) override;
 
-    void Process(TransportManager& manager) const override;
+    void Process(Server& manager) const override;
 
     BusData bus;
 };
@@ -58,7 +58,7 @@ struct AddStopRequest : UpdateRequest {
     void ParseFrom(std::string_view input) override;
     void ParseFromJson(const Json::Node& node) override;
 
-    void Process(TransportManager& manager) const override;
+    void Process(Server& manager) const override;
 
     StopData stop;
 };
@@ -68,7 +68,7 @@ struct BusInfoRequest : ReadRequest {
     void ParseFrom(std::string_view input) override;
     void ParseFromJson(const Json::Node& node) override;
 
-    ResponsePtr Process(const TransportManager& manager) const override;
+    ResponsePtr Process(const Server& manager) const override;
 
     size_t request_id;
     std::string bus_name;
@@ -79,7 +79,7 @@ struct StopInfoRequest : ReadRequest {
     void ParseFrom(std::string_view input) override;
     void ParseFromJson(const Json::Node& node) override;
 
-    ResponsePtr Process(const TransportManager& manager) const override;
+    ResponsePtr Process(const Server& manager) const override;
 
     size_t request_id;
     std::string stop_name;
@@ -93,7 +93,7 @@ RequestPtr ParseJsonRequest(const Json::Node &node, bool is_update_request);
 
 std::vector<RequestPtr> ReadJsonRequests(std::istream& in_stream = std::cin);
 
-std::vector<ResponsePtr> ProcessRequests(TransportManager& manager,
+std::vector<ResponsePtr> ProcessRequests(Server& manager,
                                          const std::vector<RequestPtr>& requests);
 
 std::ostream& operator<<(std::ostream& out_stream, const Request::Type& type);

@@ -32,7 +32,7 @@ private:
     std::unordered_map<Path, size_t, PathHasher> distances_;
 };
 
-class TransportManager
+class Server
 {
 public:
     void AddBus(std::string bus_name, std::vector<std::string> stop_names, bool is_circle_path);

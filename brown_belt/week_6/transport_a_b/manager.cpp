@@ -63,15 +63,15 @@ double StopManager::ComputeLength(const StopNames &stop_names) const
     return total_length;
 }
 
-void TransportManager::AddBus(string bus_name, vector<string> stop_names, bool is_circle_path)
+void Server::AddBus(string bus_name, vector<string> stop_names, bool is_circle_path)
 {
     bus_manager_.AddBus(move(bus_name), move(stop_names), is_circle_path);
 }
-void TransportManager::AddStop(string stop_name, Coordinates coords)
+void Server::AddStop(string stop_name, Coordinates coords)
 {
     stop_manager_.AddStop(move(stop_name), move(coords));
 }
-ResponsePtr TransportManager::BusInfo(string bus_name) const
+ResponsePtr Server::BusInfo(string bus_name) const
 {
     BusStat stats;
     stats.bus_name = move(bus_name);
@@ -84,7 +84,7 @@ ResponsePtr TransportManager::BusInfo(string bus_name) const
     return make_unique<BusInfoResponse>(move(stats));
 }
 
-ResponsePtr TransportManager::StopInfo(string stop_name) const
+ResponsePtr Server::StopInfo(string stop_name) const
 {
     StopStat stats;
     stats.stop_name = move(stop_name);

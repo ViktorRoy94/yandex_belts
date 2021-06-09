@@ -20,6 +20,7 @@ struct Request {
     enum class Type {
         ADD_STOP,
         ADD_BUS,
+        ADD_ROUTE_SETTINGS,
         BUS_INFO,
         STOP_INFO,
         ROUTE_INFO
@@ -36,7 +37,7 @@ struct Request {
 
 struct ReadRequest : Request {
     using Request::Request;
-    virtual ResponsePtr Process(const TransportManager& manager) const = 0;
+    virtual ResponsePtr Process(const Server& manager) const = 0;
 
     size_t request_id;
 };
@@ -44,7 +45,7 @@ struct ReadRequest : Request {
 struct UpdateRequest : Request {
     using Request::Request;
 
-    virtual void Process(TransportManager& manager) const = 0;
+    virtual void Process(Server& manager) const = 0;
 };
 
 struct AddBusRequest : UpdateRequest {
@@ -52,7 +53,7 @@ struct AddBusRequest : UpdateRequest {
     void ParseFrom(std::string_view input) override;
     void ParseFromJson(const Json::Node& node) override;
 
-    void Process(TransportManager& manager) const override;
+    void Process(Server& manager) const override;
 
     BusData bus;
 };
@@ -62,9 +63,19 @@ struct AddStopRequest : UpdateRequest {
     void ParseFrom(std::string_view input) override;
     void ParseFromJson(const Json::Node& node) override;
 
-    void Process(TransportManager& manager) const override;
+    void Process(Server& manager) const override;
 
     StopData stop;
+};
+
+struct AddRouteSettingsRequest : UpdateRequest {
+    AddRouteSettingsRequest() : UpdateRequest(Type::ADD_ROUTE_SETTINGS) {}
+    void ParseFrom(std::string_view input) override;
+    void ParseFromJson(const Json::Node& node) override;
+
+    void Process(Server& manager) const override;
+
+    RoutingSettings settings;
 };
 
 struct BusInfoRequest : ReadRequest {
@@ -72,7 +83,7 @@ struct BusInfoRequest : ReadRequest {
     void ParseFrom(std::string_view input) override;
     void ParseFromJson(const Json::Node& node) override;
 
-    ResponsePtr Process(const TransportManager& manager) const override;
+    ResponsePtr Process(const Server& manager) const override;
 
     std::string bus_name;
 };
@@ -82,7 +93,7 @@ struct StopInfoRequest : ReadRequest {
     void ParseFrom(std::string_view input) override;
     void ParseFromJson(const Json::Node& node) override;
 
-    ResponsePtr Process(const TransportManager& manager) const override;
+    ResponsePtr Process(const Server& manager) const override;
 
     std::string stop_name;
 };
@@ -92,7 +103,7 @@ struct RouteInfoRequest : ReadRequest {
     void ParseFrom(std::string_view input) override;
     void ParseFromJson(const Json::Node& node) override;
 
-    ResponsePtr Process(const TransportManager& manager) const override;
+    ResponsePtr Process(const Server& manager) const override;
 
     Path path;
 };
@@ -107,7 +118,7 @@ RoutingSettings ReadJsonRoutingSettings(const Json::Node &node);
 
 std::vector<RequestPtr> ReadJsonRequests(const Json::Node &node);
 
-std::vector<ResponsePtr> ProcessRequests(TransportManager& manager,
+std::vector<ResponsePtr> ProcessRequests(Server& manager,
                                          const std::vector<RequestPtr>& requests);
 
 std::ostream& operator<<(std::ostream& out_stream, const Request::Type& type);

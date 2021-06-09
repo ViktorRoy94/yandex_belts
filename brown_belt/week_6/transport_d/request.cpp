@@ -44,7 +44,7 @@ void AddBusRequest::ParseFromJson(const Node& node)
         bus.stops.push_back(stop_name_node.AsString());
     }
 }
-void AddBusRequest::Process(TransportManager& manager) const
+void AddBusRequest::Process(Server& manager) const
 {
     manager.AddBus(move(bus));
 }
@@ -74,7 +74,7 @@ void AddStopRequest::ParseFromJson(const Node& node)
         stop.distances.push_back({stop_name_node, distance.AsInt()});
     }
 }
-void AddStopRequest::Process(TransportManager& manager) const
+void AddStopRequest::Process(Server& manager) const
 {
     manager.AddStop(move(stop));
 }
@@ -90,7 +90,7 @@ void BusInfoRequest::ParseFromJson(const Node& node)
     request_id = dict.at("id").AsInt();
     bus_name = dict.at("name").AsString();
 }
-ResponsePtr BusInfoRequest::Process(const TransportManager& manager) const
+ResponsePtr BusInfoRequest::Process(const Server& manager) const
 {
     return manager.BusInfo(request_id, move(bus_name));
 }
@@ -106,7 +106,7 @@ void StopInfoRequest::ParseFromJson(const Node& node)
     request_id = dict.at("id").AsInt();
     stop_name = dict.at("name").AsString();
 }
-ResponsePtr StopInfoRequest::Process(const TransportManager& manager) const
+ResponsePtr StopInfoRequest::Process(const Server& manager) const
 {
     return manager.StopInfo(request_id, move(stop_name));
 }
@@ -219,7 +219,7 @@ std::vector<RequestPtr> ReadJsonRequests(std::istream& in_stream)
     return requests;
 }
 
-vector<ResponsePtr> ProcessRequests(TransportManager& manager, const vector<RequestPtr>& requests)
+vector<ResponsePtr> ProcessRequests(Server& manager, const vector<RequestPtr>& requests)
 {
     vector<ResponsePtr> responses;
     for (const auto& request_holder : requests) {

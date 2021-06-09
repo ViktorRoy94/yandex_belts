@@ -70,8 +70,10 @@ struct WaitItem : RouteItem {
     virtual void PrintJson(std::ostream& out = std::cout) override;
 
     std::string stop_name;
-    double time;
+    double time = 0.0;
 };
+bool operator==(const WaitItem& lhs, const WaitItem& rhs);
+std::ostream& operator<<(std::ostream& out_stream, const WaitItem& item);
 
 struct BusItem : RouteItem {
     BusItem(std::string bus_name, size_t span_count, double time)
@@ -84,6 +86,8 @@ struct BusItem : RouteItem {
     size_t span_count = 0;
     double time = 0.0;
 };
+bool operator==(const BusItem& lhs, const BusItem& rhs);
+std::ostream& operator<<(std::ostream& out_stream, const BusItem& item);
 
 struct RouteStat
 {
@@ -103,7 +107,16 @@ struct PathHasher {
     size_t operator() (const Path& a) const;
 };
 
+struct StringPairHasher {
+    size_t operator() (const std::pair<std::string, std::string>& a) const;
+};
+
 struct RoutingSettings {
+    RoutingSettings() {}
+    RoutingSettings(int wait_time, double velocity)
+        : bus_wait_time(wait_time)
+        , bus_velocity(velocity * 50.0 / 3)
+    {}
     int bus_wait_time = 0;
     double bus_velocity = 0;
 };
