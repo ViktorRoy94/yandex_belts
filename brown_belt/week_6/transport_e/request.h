@@ -18,9 +18,9 @@ using RequestPtr = std::unique_ptr<Request>;
 
 struct Request {
     enum class Type {
+        ADD_ROUTE_SETTINGS,
         ADD_STOP,
         ADD_BUS,
-        ADD_ROUTE_SETTINGS,
         BUS_INFO,
         STOP_INFO,
         ROUTE_INFO

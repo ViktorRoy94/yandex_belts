@@ -112,63 +112,28 @@ bool RouteManager::IsInitialized() const
 
 void RouteManager::Initialize()
 {
-    VertexId id = 0;
-    for (const auto& [bus_name, stop_names] : bus_manager_.GetBuses()) {
-        for (const auto& stop_name : stop_names) {
-            VertexName vertex_name = {stop_name, bus_name};
-            if (vertex_name_to_id_.count(vertex_name) == 0) {
-                vertex_name_to_id_[vertex_name] = id;
-                vertex_id_to_name_[id] = move(vertex_name);
-                id++;
-            }
+    for (const auto& stop_name : stop_manager_.GetStopNames()) {
+        vertex_id_to_name_.push_back(stop_name);
+        vertex_name_to_id_[stop_name] = vertex_id_to_name_.size() - 1;
+    }
+    graph_ = make_unique<DirectedWeightedGraph>(vertex_name_to_id_.size());
 
-            vertex_name = {stop_name, ""};
-            if (vertex_name_to_id_.count(vertex_name) == 0) {
-                vertex_name_to_id_[vertex_name] = id;
-                vertex_id_to_name_[id] = move(vertex_name);
-                id++;
-            }
-        }
-    }
-    {
-        LOG_DURATION("Graph creation");
-        graph_ = make_unique<DirectedWeightedGraph<double>>(vertex_name_to_id_.size());
-    }
     for (const auto& [bus_name, stop_names] : bus_manager_.GetBuses()) {
         for (size_t i = 0; i < stop_names.size() - 1; ++i) {
-            double d = stop_manager_.GetDistance({stop_names[i], stop_names[i+1]});
-            double weight = d / settings_.bus_velocity;
-            VertexId from = vertex_name_to_id_[{stop_names[i],   bus_name}];
-            VertexId to   = vertex_name_to_id_[{stop_names[i+1], bus_name}];
-            if (stop_names[0] == stop_names[i+1]) {
-                to = vertex_name_to_id_[{stop_names[i+1], ""}];
-            }
+            EdgeWeight weight = {static_cast<double>(settings_.bus_wait_time), 0};
+            for (size_t j = i; j < stop_names.size() - 1; ++j) {
+                double d = stop_manager_.GetDistance({stop_names[j], stop_names[j+1]});
+                weight.weight += d / settings_.bus_velocity;
+                weight.span_count++;
+                weight.bus = bus_name;
 
-            AddEdge({from, to, weight});
-        }
-    }
-    for (const auto& stop_name : stop_manager_.GetStopNames()) {
-        const auto& buses_on_this_stop = bus_manager_.GetBusesForStop(stop_name);
-        for (auto it = buses_on_this_stop.begin(); it != buses_on_this_stop.end(); it++) {
-            VertexId from = vertex_name_to_id_[{stop_name, *it}];
-            VertexId to   = vertex_name_to_id_[{stop_name, ""}];
-            AddEdge({from, to,   static_cast<double>(settings_.bus_wait_time)});
-            AddEdge({to,   from, static_cast<double>(settings_.bus_wait_time)});
-            for (auto it2 = buses_on_this_stop.begin(); it2 != buses_on_this_stop.end(); it2++) {
-                if (*it == *it2) {
-                    continue;
-                }
-                VertexId from = vertex_name_to_id_[{stop_name, *it}];
-                VertexId to   = vertex_name_to_id_[{stop_name, *it2}];
-                AddEdge({from, to,   static_cast<double>(settings_.bus_wait_time)});
-                AddEdge({to,   from, static_cast<double>(settings_.bus_wait_time)});
+                VertexId from = vertex_name_to_id_[stop_names[i]];
+                VertexId to   = vertex_name_to_id_[stop_names[j+1]];
+                AddEdge({from, to, weight});
             }
         }
     }
-    {
-        LOG_DURATION("Router creation");
-        router_ = make_unique<Router<double>>(*graph_);
-    }
+    router_ = make_unique<Router>(*graph_);
     initialized_ = true;
 }
 
@@ -177,83 +142,57 @@ void RouteManager::UpdateRouteSettings(RoutingSettings settings)
     settings_ = move(settings);
 }
 
-std::vector<RouteItemPtr> RouteManager::GetRoute(const Path& path) const
+optional<vector<RouteItemPtr> > RouteManager::GetRoute(const Path& path) const
 {
     if (cached_routes_.count(path) == 0) {
-        BuildRoute(path);
+        bool result = BuildRoute(path);
+        if (!result) return nullopt;
     }
 
-    string last_bus_name;
-    size_t span_count = 0;
-    double travel_time = 0.0;
     vector<RouteItemPtr> route_items;
-    Router<double>::RouteInfo route_info = cached_routes_[path];
+    RouteInfo route_info = cached_routes_[path];
     for (size_t i = 0; i < route_info.edge_count; i++) {
         EdgeId edge_id = router_->GetRouteEdge(route_info.id, i);
-        const Edge<double>& e = edge_id_to_edge_.at(edge_id);
-        VertexName from = vertex_id_to_name_.at(e.from);
-        VertexName to   = vertex_id_to_name_.at(e.to);
+        const Edge& e = edge_id_to_edge_[edge_id];
+        string from = string(vertex_id_to_name_[e.from]);
 
-        if (from.second != to.second && to.second != "") {
-            if (span_count > 0) {
-                RouteItemPtr item = make_unique<BusItem>(from.second, span_count, travel_time);
-                route_items.push_back(move(item));
-            }
-
-            RouteItemPtr item = make_unique<WaitItem>(from.first, e.weight);
-            route_items.push_back(move(item));
-            span_count = 0;
-            travel_time = 0;
-        } else {
-            last_bus_name = from.second;
-            span_count++;
-            travel_time += e.weight;
-        }
+        RouteItemPtr wait_item = make_unique<WaitItem>(from, settings_.bus_wait_time);
+        RouteItemPtr bus_item  = make_unique<BusItem>(string(e.weight.bus),
+                                                      e.weight.span_count,
+                                                      e.weight.weight - settings_.bus_wait_time);
+        route_items.push_back(move(wait_item));
+        route_items.push_back(move(bus_item));
     }
-    if (span_count > 0) {
-        RouteItemPtr item = make_unique<BusItem>(last_bus_name, span_count, travel_time);
-        route_items.push_back(move(item));
-    }
-
-    return route_items;
+    return move(route_items);
 }
 
-double RouteManager::GetRouteTime(const Path& path) const
+optional<double> RouteManager::GetRouteTime(const Path& path) const
 {
     if (cached_routes_.count(path) == 0) {
-        BuildRoute(path);
+        return nullopt;
     }
-    return cached_routes_.at(path).weight;
+    return cached_routes_.at(path).weight.weight;
 }
 
-void RouteManager::AddEdge(Edge<double> edge) {
+void RouteManager::AddEdge(Edge edge) {
     auto p = edges_.insert(move(edge));
     if (p.second) {
-        EdgeId edge_id = graph_->AddEdge(*p.first);
-        edge_id_to_edge_[edge_id] = *p.first;
+        graph_->AddEdge(*p.first);
+        edge_id_to_edge_.push_back(*p.first);
     }
 }
 
-void RouteManager::BuildRoute(const Path& path) const
+bool RouteManager::BuildRoute(const Path& path) const
 {
-    VertexId from = vertex_name_to_id_.at({path.from, ""});
-    VertexId to   = vertex_name_to_id_.at({path.to,   ""});
+    VertexId from = vertex_name_to_id_.at(path.from);
+    VertexId to   = vertex_name_to_id_.at(path.to);
 
     auto route = router_->BuildRoute(from, to);
     if (route.has_value()) {
-        Router<double>::RouteInfo route_info = *route;
-        if (route_info.edge_count > 0) {
-            EdgeId id = router_->GetRouteEdge(route_info.id, route_info.edge_count - 1);
-            const Edge<double>& e  = edge_id_to_edge_.at(id);
-            VertexName from = vertex_id_to_name_.at(e.from);
-            VertexName to   = vertex_id_to_name_.at(e.to);
-            if (from.first == to.first) {
-                route_info.edge_count--;
-                route_info.weight -= settings_.bus_wait_time;
-            }
-        }
+        RouteInfo route_info = *route;
         cached_routes_[path] = route_info;
     }
+    return route.has_value();
 }
 
 Server::Server() : route_manager_(bus_manager_, stop_manager_)
@@ -310,11 +249,11 @@ ResponsePtr Server::RouteInfo(size_t request_id, Path path) const
         route_manager_.Initialize();
     }
     auto route_items = route_manager_.GetRoute(path);
-    if (route_items.size() != 0) {
-        stats.items = move(route_items);
+    if (route_items.has_value()) {
+        stats.items = move(route_items.value());
+        stats.total_time = route_manager_.GetRouteTime(path).value();
     } else {
         stats.error_message = "not found";
     }
-    stats.total_time = route_manager_.GetRouteTime(path);
     return make_unique<RouteInfoResponse>(request_id, move(stats));
 }

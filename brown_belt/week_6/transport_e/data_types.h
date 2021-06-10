@@ -61,6 +61,7 @@ using RouteItemPtr = std::unique_ptr<RouteItem>;
 
 struct RouteItem {
     virtual void PrintJson(std::ostream& out = std::cout) = 0;
+    virtual ~RouteItem() = default;
 };
 
 struct WaitItem : RouteItem {
@@ -105,10 +106,6 @@ struct Path
 
 struct PathHasher {
     size_t operator() (const Path& a) const;
-};
-
-struct StringPairHasher {
-    size_t operator() (const std::pair<std::string, std::string>& a) const;
 };
 
 struct RoutingSettings {

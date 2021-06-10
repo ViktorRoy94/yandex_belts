@@ -49,30 +49,57 @@ public:
     bool IsInitialized() const;
     void Initialize();
     void UpdateRouteSettings(RoutingSettings settings);
-    std::vector<RouteItemPtr> GetRoute(const Path& path) const;
-    double GetRouteTime(const Path& path) const;
+    std::optional<std::vector<RouteItemPtr>> GetRoute(const Path& path) const;
+    std::optional<double> GetRouteTime(const Path& path) const;
 
 private:
-    using VertexName = std::pair<std::string, std::string>;
+    struct EdgeWeight {
+        double weight = 0.0;
+        int span_count = 0;
+        std::string_view bus;
+        bool operator>(const EdgeWeight& other) const {
+            return weight > other.weight;
+        }
+        bool operator<(const EdgeWeight& other) const {
+            return weight < other.weight;
+        }
+        bool operator==(const EdgeWeight& other) const {
+            return weight == other.weight;
+        }
+        bool operator>=(const EdgeWeight& other) const {
+            return weight >= other.weight;
+        }
+        bool operator>=(int value) const {
+            return weight >= value;
+        }
+        EdgeWeight operator+(const EdgeWeight& other) const {
+            return {weight + other.weight, 0, other.bus};
+        }
+    };
+
+    using Router = Graph::Router<EdgeWeight>;
+    using RouteInfo = Router::RouteInfo;
+    using Edge = Graph::Edge<EdgeWeight>;
+    using EdgeHasher = Graph::EdgeHasher<EdgeWeight>;
+    using DirectedWeightedGraph = Graph::DirectedWeightedGraph<EdgeWeight>;
 
     bool initialized_ = false;
     const BusManager& bus_manager_;
     const StopManager& stop_manager_;
 
     RoutingSettings settings_;
-    std::unordered_map<VertexName, size_t, StringPairHasher> vertex_name_to_id_;
-    std::unordered_map<size_t, VertexName> vertex_id_to_name_;
+    std::unordered_map<std::string_view, size_t> vertex_name_to_id_;
+    std::vector<std::string_view> vertex_id_to_name_;
+    std::unordered_set<Edge, EdgeHasher> edges_;
+    std::vector<Edge> edge_id_to_edge_;
 
-    std::unordered_set<Graph::Edge<double>, Graph::EdgeHasher<double>> edges_;
-    std::unordered_map<size_t, Graph::Edge<double>> edge_id_to_edge_;
+    std::unique_ptr<DirectedWeightedGraph> graph_;
+    std::unique_ptr<Router> router_;
 
-    std::unique_ptr<Graph::DirectedWeightedGraph<double>> graph_;
-    std::unique_ptr<Graph::Router<double>> router_;
+    mutable std::unordered_map<Path, Graph::Router<EdgeWeight>::RouteInfo, PathHasher> cached_routes_;
 
-    mutable std::unordered_map<Path, Graph::Router<double>::RouteInfo, PathHasher> cached_routes_;
-
-    void AddEdge(Graph::Edge<double> edge);
-    void BuildRoute(const Path& path) const;
+    void AddEdge(Edge edge);
+    bool BuildRoute(const Path& path) const;
 };
 
 class Server

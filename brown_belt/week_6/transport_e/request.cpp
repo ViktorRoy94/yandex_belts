@@ -7,12 +7,12 @@ using namespace Json;
 RequestPtr Request::Create(Request::Type type)
 {
     switch (type) {
+    case Request::Type::ADD_ROUTE_SETTINGS:
+        return make_unique<AddRouteSettingsRequest>();
     case Request::Type::ADD_BUS:
         return make_unique<AddBusRequest>();
     case Request::Type::ADD_STOP:
         return make_unique<AddStopRequest>();
-    case Request::Type::ADD_ROUTE_SETTINGS:
-        return make_unique<AddRouteSettingsRequest>();
     case Request::Type::BUS_INFO:
         return make_unique<BusInfoRequest>();
     case Request::Type::STOP_INFO:

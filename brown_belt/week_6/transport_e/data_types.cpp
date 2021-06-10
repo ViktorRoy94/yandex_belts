@@ -35,12 +35,6 @@ size_t PathHasher::operator() (const Path& a) const {
     return coef * shash(a.from) + shash(a.to);
 }
 
-size_t StringPairHasher::operator() (const pair<string, string>& a) const {
-    size_t coef = 280561877;
-    hash<string> shash;
-    return coef * shash(a.first) + shash(a.second);
-}
-
 void WaitItem::PrintJson(std::ostream& out) {
     out << "{";
     out << "\"type\": \"Wait\", ";

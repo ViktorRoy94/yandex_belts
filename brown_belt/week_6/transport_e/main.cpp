@@ -27,7 +27,7 @@ bool CompareResponseJsonStrings(std::string str1, std::string str2) {
             result = result && map1.at("request_id").AsInt() == map2.at("request_id").AsInt();
             double time_diff = abs(map1.at("total_time").AsDouble() -
                                    map2.at("total_time").AsDouble());
-            result = result && time_diff < 0.0001;
+            result = result && time_diff < 0.01;
         }
     }
     return result;
@@ -232,7 +232,7 @@ void TestJsonCompare() {
     {
         string input(R"({"int": 10, "double": 1823423.1231, "bool": true, "array": [1, 2, 3]})");
         string input_changed_int(R"({"int": 9, "double": 1823423.1231, "bool": true, "array": [1, 2, 3]})");
-        string input_changed_double(R"({"int": 10, "double": 1823423.12, "bool": true, "array": [1, 2, 3]})");
+        string input_changed_double(R"({"int": 10, "double": 1823423.14, "bool": true, "array": [1, 2, 3]})");
         string input_changed_bool(R"({"int": 10, "double": 1823423.1231, "bool": false, "array": [1, 2, 3]})");
         string input_changed_map(R"({"int": 10, "double": 1823423.1231, "bool": true)");
         string input_changed_array(R"({"int": 10, "double": 1823423.1231, "bool": true, "array": [10, 2, 3]})");
@@ -812,14 +812,14 @@ void TestRouteManager() {
         manager.Initialize();
         {
             Path path = {"Biryulyovo Zapadnoye", "Universam"};
-            auto route_items = manager.GetRoute(path);
-            ASSERT_EQUAL(manager.GetRouteTime(path), 11.235);
+            auto route_items = manager.GetRoute(path).value();
+            ASSERT(abs(manager.GetRouteTime(path).value() - 11.235) < 0.0001);
             ASSERT_EQUAL(route_items.size(), 2u);
         }
         {
             Path path = {"Biryulyovo Zapadnoye", "Prazhskaya"};
-            auto route_items = manager.GetRoute(path);
-            ASSERT_EQUAL(manager.GetRouteTime(path), 24.21);
+            auto route_items = manager.GetRoute(path).value();
+            ASSERT_EQUAL(manager.GetRouteTime(path).value(), 24.21);
             ASSERT_EQUAL(route_items.size(), 4u);
 
             WaitItem* wait_item_1 = dynamic_cast<WaitItem*>(route_items[0].get());
@@ -828,135 +828,135 @@ void TestRouteManager() {
             BusItem* bus_item_4 = dynamic_cast<BusItem*>(route_items[3].get());
 
             ASSERT_EQUAL(*wait_item_1, WaitItem("Biryulyovo Zapadnoye", 6.0));
-            ASSERT_EQUAL(*bus_item_2, BusItem("297", 1, 3.9));
-            ASSERT_EQUAL(*wait_item_3, WaitItem("Biryulyovo Tovarnaya", 6.0));
-            ASSERT_EQUAL(*bus_item_4, BusItem("635", 2, 8.31));
+            ASSERT_EQUAL(*bus_item_2, BusItem("297", 2, 5.235));
+            ASSERT_EQUAL(*wait_item_3, WaitItem("Universam", 6.0));
+            ASSERT_EQUAL(*bus_item_4, BusItem("635", 1, 6.975));
         }
     }
-//    {
-//        BusManager bus_manager;
-//        bus_manager.AddBus({"297", {"Biryulyovo Zapadnoye",
-//                                    "Biryulyovo Tovarnaya",
-//                                    "Universam",
-//                                    "Biryusinka",
-//                                    "Apteka",
-//                                    "Biryulyovo Zapadnoye"}, true});
-//        bus_manager.AddBus({"635", {"Biryulyovo Tovarnaya",
-//                                    "Universam",
-//                                    "Biryusinka",
-//                                    "TETs 26",
-//                                    "Pokrovskaya",
-//                                    "Prazhskaya"}, false});
-//        bus_manager.AddBus({"828", {"Biryulyovo Zapadnoye",
-//                                    "TETs 26",
-//                                    "Biryusinka",
-//                                    "Universam",
-//                                    "Pokrovskaya",
-//                                    "Rossoshanskaya ulitsa"}, false});
-//        bus_manager.AddBus({"750", {"Tolstopaltsevo",
-//                                    "Rasskazovka"}, false});
+    {
+        BusManager bus_manager;
+        bus_manager.AddBus({"297", {"Biryulyovo Zapadnoye",
+                                    "Biryulyovo Tovarnaya",
+                                    "Universam",
+                                    "Biryusinka",
+                                    "Apteka",
+                                    "Biryulyovo Zapadnoye"}, true});
+        bus_manager.AddBus({"635", {"Biryulyovo Tovarnaya",
+                                    "Universam",
+                                    "Biryusinka",
+                                    "TETs 26",
+                                    "Pokrovskaya",
+                                    "Prazhskaya"}, false});
+        bus_manager.AddBus({"828", {"Biryulyovo Zapadnoye",
+                                    "TETs 26",
+                                    "Biryusinka",
+                                    "Universam",
+                                    "Pokrovskaya",
+                                    "Rossoshanskaya ulitsa"}, false});
+        bus_manager.AddBus({"750", {"Tolstopaltsevo",
+                                    "Rasskazovka"}, false});
 
-//        StopManager stop_manager;
-//        stop_manager.AddStop({"Biryulyovo Zapadnoye", {}, {{"Biryulyovo Tovarnaya", 2600u},
-//                                                           {"TETs 26", 1100u}}});
-//        stop_manager.AddStop({"Universam", {}, {{"Biryusinka", 760u},
-//                                                {"Biryulyovo Tovarnaya", 1380u},
-//                                                {"Pokrovskaya", 2460u}}});
-//        stop_manager.AddStop({"Biryulyovo Tovarnaya", {}, {{"Universam", 890u}}});
-//        stop_manager.AddStop({"Biryusinka", {}, {{"Apteka", 210u},
-//                                                 {"TETs 26", 400u}}});
-//        stop_manager.AddStop({"Apteka", {}, {{"Biryulyovo Zapadnoye", 1420u}}});
-//        stop_manager.AddStop({"TETs 26", {}, {{"Pokrovskaya", 2850u}}});
-//        stop_manager.AddStop({"Pokrovskaya", {}, {{"Rossoshanskaya ulitsa", 3140u}}});
-//        stop_manager.AddStop({"Rossoshanskaya ulitsa", {}, {{"Pokrovskaya", 3210u}}});
-//        stop_manager.AddStop({"Prazhskaya", {}, {{"Pokrovskaya", 2260u}}});
-//        stop_manager.AddStop({"Tolstopaltsevo", {}, {{"Rasskazovka", 13800u}}});
-//        stop_manager.AddStop({"Rasskazovka", {}, {}});
+        StopManager stop_manager;
+        stop_manager.AddStop({"Biryulyovo Zapadnoye", {}, {{"Biryulyovo Tovarnaya", 2600u},
+                                                           {"TETs 26", 1100u}}});
+        stop_manager.AddStop({"Universam", {}, {{"Biryusinka", 760u},
+                                                {"Biryulyovo Tovarnaya", 1380u},
+                                                {"Pokrovskaya", 2460u}}});
+        stop_manager.AddStop({"Biryulyovo Tovarnaya", {}, {{"Universam", 890u}}});
+        stop_manager.AddStop({"Biryusinka", {}, {{"Apteka", 210u},
+                                                 {"TETs 26", 400u}}});
+        stop_manager.AddStop({"Apteka", {}, {{"Biryulyovo Zapadnoye", 1420u}}});
+        stop_manager.AddStop({"TETs 26", {}, {{"Pokrovskaya", 2850u}}});
+        stop_manager.AddStop({"Pokrovskaya", {}, {{"Rossoshanskaya ulitsa", 3140u}}});
+        stop_manager.AddStop({"Rossoshanskaya ulitsa", {}, {{"Pokrovskaya", 3210u}}});
+        stop_manager.AddStop({"Prazhskaya", {}, {{"Pokrovskaya", 2260u}}});
+        stop_manager.AddStop({"Tolstopaltsevo", {}, {{"Rasskazovka", 13800u}}});
+        stop_manager.AddStop({"Rasskazovka", {}, {}});
 
-//        RouteManager manager(bus_manager, stop_manager);
-//        manager.UpdateRouteSettings(RoutingSettings(2, 30));
-//        manager.Initialize();
-//        {
-//            Path path = {"Biryulyovo Zapadnoye", "Apteka"};
-//            ASSERT_EQUAL(manager.GetRouteTime(path), 7.42);
-//            auto route_items = manager.GetRoute(path);
-//            ASSERT_EQUAL(route_items.size(), 4u);
-//        }
-//        {
-//            Path path = {"Biryulyovo Zapadnoye", "Pokrovskaya"};
-//            auto route_items = manager.GetRoute(path);
-//            ASSERT_EQUAL(manager.GetRouteTime(path), 11.44);
-//            ASSERT_EQUAL(route_items.size(), 2u);
-//        }
-//        {
-//            Path path = {"Biryulyovo Tovarnaya", "Pokrovskaya"};
-//            auto route_items = manager.GetRoute(path);
-//            ASSERT_EQUAL(manager.GetRouteTime(path), 10.7);
-//            ASSERT_EQUAL(route_items.size(), 4u);
-//        }
-//        {
-//            Path path = {"Biryulyovo Tovarnaya", "Biryulyovo Zapadnoye"};
-//            auto route_items = manager.GetRoute(path);
-//            ASSERT_EQUAL(manager.GetRouteTime(path), 8.56);
-//            ASSERT_EQUAL(route_items.size(), 2u);
-//        }
-//        {
-//            Path path = {"Biryulyovo Tovarnaya", "Prazhskaya"};
-//            auto route_items = manager.GetRoute(path);
-//            ASSERT_EQUAL(manager.GetRouteTime(path), 16.32);
-//            ASSERT_EQUAL(route_items.size(), 2u);
-//        }
-//        {
-//            Path path = {"Apteka", "Biryulyovo Tovarnaya"};
-//            auto route_items = manager.GetRoute(path);
-//            ASSERT_EQUAL(manager.GetRouteTime(path), 12.04);
-//            ASSERT_EQUAL(route_items.size(), 4u);
-//        }
-//        {
-//            Path path = {"Biryulyovo Zapadnoye", "Tolstopaltsevo"};
-//            auto route_items = manager.GetRoute(path);
-//            ASSERT_EQUAL(route_items.size(), 0u);
-//        }
-//    }
-//    {
-//        BusManager bus_manager;
-//        bus_manager.AddBus({"289", {"Zagorye",
-//                                    "Lipetskaya ulitsa 46",
-//                                    "Lipetskaya ulitsa 40",
-//                                    "Lipetskaya ulitsa 40",
-//                                    "Lipetskaya ulitsa 46",
-//                                    "Moskvorechye",
-//                                    "Zagorye"}, true});
-//        StopManager stop_manager;
-//        stop_manager.AddStop({"Zagorye", {}, {{"Lipetskaya ulitsa 46", 230u}}});
-//        stop_manager.AddStop({"Lipetskaya ulitsa 46", {}, {{"Lipetskaya ulitsa 40", 390u},
-//                                                           {"Moskvorechye", 12400u}}});
-//        stop_manager.AddStop({"Lipetskaya ulitsa 40", {}, {{"Lipetskaya ulitsa 40", 1090u},
-//                                                           {"Lipetskaya ulitsa 46", 380u}}});
-//        stop_manager.AddStop({"Moskvorechye", {}, {{"Zagorye", 10000u}}});
+        RouteManager manager(bus_manager, stop_manager);
+        manager.UpdateRouteSettings(RoutingSettings(2, 30));
+        manager.Initialize();
+        {
+            Path path = {"Biryulyovo Zapadnoye", "Apteka"};
+            auto route_items = manager.GetRoute(path).value();
+            ASSERT_EQUAL(manager.GetRouteTime(path).value(), 7.42);
+            ASSERT_EQUAL(route_items.size(), 4u);
+        }
+        {
+            Path path = {"Biryulyovo Zapadnoye", "Pokrovskaya"};
+            auto route_items = manager.GetRoute(path).value();
+            ASSERT_EQUAL(manager.GetRouteTime(path).value(), 11.44);
+            ASSERT_EQUAL(route_items.size(), 2u);
+        }
+        {
+            Path path = {"Biryulyovo Tovarnaya", "Pokrovskaya"};
+            auto route_items = manager.GetRoute(path).value();
+            ASSERT_EQUAL(manager.GetRouteTime(path).value(), 10.7);
+            ASSERT_EQUAL(route_items.size(), 4u);
+        }
+        {
+            Path path = {"Biryulyovo Tovarnaya", "Biryulyovo Zapadnoye"};
+            auto route_items = manager.GetRoute(path).value();
+            ASSERT_EQUAL(manager.GetRouteTime(path).value(), 8.56);
+            ASSERT_EQUAL(route_items.size(), 2u);
+        }
+        {
+            Path path = {"Biryulyovo Tovarnaya", "Prazhskaya"};
+            auto route_items = manager.GetRoute(path).value();
+            ASSERT_EQUAL(manager.GetRouteTime(path).value(), 16.32);
+            ASSERT_EQUAL(route_items.size(), 2u);
+        }
+        {
+            Path path = {"Apteka", "Biryulyovo Tovarnaya"};
+            auto route_items = manager.GetRoute(path).value();
+            ASSERT_EQUAL(manager.GetRouteTime(path).value(), 12.04);
+            ASSERT_EQUAL(route_items.size(), 4u);
+        }
+        {
+            Path path = {"Biryulyovo Zapadnoye", "Tolstopaltsevo"};
+            ASSERT(manager.GetRoute(path) == nullopt);
+            ASSERT(manager.GetRouteTime(path) == nullopt);
+        }
+    }
+    {
+        BusManager bus_manager;
+        bus_manager.AddBus({"289", {"Zagorye",
+                                    "Lipetskaya ulitsa 46",
+                                    "Lipetskaya ulitsa 40",
+                                    "Lipetskaya ulitsa 40",
+                                    "Lipetskaya ulitsa 46",
+                                    "Moskvorechye",
+                                    "Zagorye"}, true});
+        StopManager stop_manager;
+        stop_manager.AddStop({"Zagorye", {}, {{"Lipetskaya ulitsa 46", 230u}}});
+        stop_manager.AddStop({"Lipetskaya ulitsa 46", {}, {{"Lipetskaya ulitsa 40", 390u},
+                                                           {"Moskvorechye", 12400u}}});
+        stop_manager.AddStop({"Lipetskaya ulitsa 40", {}, {{"Lipetskaya ulitsa 40", 1090u},
+                                                           {"Lipetskaya ulitsa 46", 380u}}});
+        stop_manager.AddStop({"Moskvorechye", {}, {{"Zagorye", 10000u}}});
 
-//        RouteManager manager(bus_manager, stop_manager);
-//        manager.UpdateRouteSettings(RoutingSettings(2, 30));
-//        manager.Initialize();
-//        {
-//            Path path = {"Zagorye", "Moskvorechye"};
-//            auto route_items = manager.GetRoute(path);
-//            ASSERT_EQUAL(manager.GetRouteTime(path), 29.26);
-//            ASSERT_EQUAL(route_items.size(), 4u);
-//        }
-//        {
-//            Path path = {"Moskvorechye", "Zagorye"};
-//            auto route_items = manager.GetRoute(path);
-//            ASSERT_EQUAL(manager.GetRouteTime(path), 22);
-//            ASSERT_EQUAL(route_items.size(), 2u);
-//        }
-//        {
-//            Path path = {"Lipetskaya ulitsa 40", "Lipetskaya ulitsa 40"};
-//            auto route_items = manager.GetRoute(path);
-//            ASSERT_EQUAL(manager.GetRouteTime(path), 0);
-//            ASSERT_EQUAL(route_items.size(), 0u);
-//        }
-//    }
+        RouteManager manager(bus_manager, stop_manager);
+        manager.UpdateRouteSettings(RoutingSettings(2, 30));
+        manager.Initialize();
+        {
+            Path path = {"Zagorye", "Moskvorechye"};
+            auto route_items = manager.GetRoute(path).value();
+            ASSERT_EQUAL(manager.GetRouteTime(path).value(), 29.26);
+            ASSERT_EQUAL(route_items.size(), 4u);
+        }
+        {
+            Path path = {"Moskvorechye", "Zagorye"};
+            auto route_items = manager.GetRoute(path).value();
+            ASSERT_EQUAL(manager.GetRouteTime(path).value(), 22);
+            ASSERT_EQUAL(route_items.size(), 2u);
+        }
+        {
+            Path path = {"Lipetskaya ulitsa 40", "Lipetskaya ulitsa 40"};
+            auto route_items = manager.GetRoute(path).value();
+            ASSERT_EQUAL(manager.GetRouteTime(path).value(), 0);
+            ASSERT_EQUAL(route_items.size(), 0u);
+        }
+    }
 }
 
 void TestPipeline() {
@@ -1098,7 +1098,7 @@ void TestJsonPipelineE_4() {
     {
         LOG_DURATION("TestJsonPipelineE_4 ProcessRequests");
         Server manager;
-        vector<ResponsePtr> responses = ProcessRequests(manager, requests);
+        responses = ProcessRequests(manager, requests);
         ASSERT_EQUAL(responses.size(), 2000u);
     }
 
@@ -1142,13 +1142,14 @@ int main() {
 
     RUN_TEST(tr, TestPipeline);
     RUN_TEST(tr, TestJsonPipeline);
-//    RUN_TEST(tr, TestJsonPipelineE_1);
-//    RUN_TEST(tr, TestJsonPipelineE_2);
-//    RUN_TEST(tr, TestJsonPipelineE_3);
-//    RUN_TEST(tr, TestJsonPipelineE_4);
+    RUN_TEST(tr, TestJsonPipelineE_1);
+    RUN_TEST(tr, TestJsonPipelineE_2);
+    RUN_TEST(tr, TestJsonPipelineE_3);
+    RUN_TEST(tr, TestJsonPipelineE_4);
 #else
-    const auto requests = ReadJsonRequests();
-    TransportManager manager;
+    Document doc = Load(cin);
+    const auto requests = ReadJsonRequests(doc.GetRoot());
+    Server manager;
     vector<ResponsePtr> responses = ProcessRequests(manager, requests);
     PrintResponcesInJsonFormat(responses);
 #endif
