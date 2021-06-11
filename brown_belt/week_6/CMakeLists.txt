@@ -35,11 +35,10 @@ target_include_directories("${PROJECT_NAME}_transport_d" PRIVATE transport_d
 add_executable("${PROJECT_NAME}_transport_e" transport_e/main.cpp
                                              transport_e/request.cpp
                                              transport_e/response.cpp
-                                             transport_e/read_utils.cpp
                                              transport_e/manager.cpp
                                              transport_e/data_types.cpp
-                                             transport_e/json.cpp)
+                                             transport_e/json.cpp
+                                             transport_e/geo.cpp)
 target_include_directories("${PROJECT_NAME}_transport_e" PRIVATE transport_e
                                                                  ${UTILS_DIR})
-
 file(COPY "transport_e/tests" DESTINATION ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})

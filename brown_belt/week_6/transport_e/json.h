@@ -30,11 +30,9 @@ public:
         return std::get<bool>(*this);
     }
     double AsDouble() const {
-        try {
-            return std::get<double>(*this);
-        } catch (std::bad_variant_access const& ex) {
-            return 1.0 * AsInt();
-        }
+        return std::holds_alternative<double>(*this) ?
+                    std::get<double>(*this) :
+                    std::get<int>(*this);
     }
     const auto& AsString() const {
         return std::get<std::string>(*this);

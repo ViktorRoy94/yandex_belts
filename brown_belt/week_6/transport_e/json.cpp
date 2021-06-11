@@ -165,7 +165,7 @@ bool CompareNodes(const Node& node1, const Node& node2) {
     try {
         const auto& double1 = node1.AsDouble();
         const auto& double2 = node2.AsDouble();
-        return result && abs(double1 - double2) < 0.01;
+        return result && abs(double1 - double2) < 0.001;
     } catch (std::bad_variant_access const&) {
     }
     try {

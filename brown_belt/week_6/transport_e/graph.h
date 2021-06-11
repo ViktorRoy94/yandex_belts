@@ -43,7 +43,7 @@ struct EdgeHasher {
         std::hash<VertexId> ihash;
         return coef * coef * ihash(a.from) +
                coef * ihash(a.to) +
-               static_cast<int>(a.weight.weight);
+               static_cast<int>(a.weight);
     }
 };
 

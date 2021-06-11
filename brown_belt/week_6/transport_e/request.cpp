@@ -1,291 +1,199 @@
 #include "request.h"
-#include "read_utils.h"
 
 using namespace std;
 using namespace Json;
+using namespace Response;
 
-RequestPtr Request::Create(Request::Type type)
-{
-    switch (type) {
-    case Request::Type::ADD_ROUTE_SETTINGS:
-        return make_unique<AddRouteSettingsRequest>();
-    case Request::Type::ADD_BUS:
-        return make_unique<AddBusRequest>();
-    case Request::Type::ADD_STOP:
-        return make_unique<AddStopRequest>();
-    case Request::Type::BUS_INFO:
-        return make_unique<BusInfoRequest>();
-    case Request::Type::STOP_INFO:
-        return make_unique<StopInfoRequest>();
-    case Request::Type::ROUTE_INFO:
-        return make_unique<RouteInfoRequest>();
-    default:
-        return nullptr;
-    }
-}
+namespace Request {
 
-void AddBusRequest::ParseFrom(string_view input)
-{
-    ReadToken(input);
-    bus.name = ReadToken(input, ":");
-    string_view delimiter = ">";
-    if (input.find(delimiter) == input.npos) {
-        delimiter = "-";
-        bus.is_circle_path = false;
-    }
-
-    while (input != "") {
-        string_view stop = ReadToken(input, delimiter);
-        bus.stops.emplace_back(string(stop));
-    }
-}
-void AddBusRequest::ParseFromJson(const Node& node)
-{
-    auto& dict = node.AsMap();
-    bus.name = dict.at("name").AsString();
-    bus.is_circle_path = dict.at("is_roundtrip").AsBool();
-    for (const auto& stop_name_node : dict.at("stops").AsArray()) {
-        bus.stops.push_back(stop_name_node.AsString());
-    }
-}
-void AddBusRequest::Process(Server& manager) const
-{
-    manager.AddBus(move(bus));
-}
-
-void AddStopRequest::ParseFrom(string_view input)
-{
-    ReadToken(input);
-    stop.name = ReadToken(input, ":");
-    stop.coords.latitude = ConvertToDouble(ReadToken(input, ","));
-    stop.coords.longitude = ConvertToDouble(ReadToken(input, ","));
-    while (input.size() > 0) {
-        string_view distance_view = ReadToken(input, "m ");
-        size_t distance = ConvertToInt(distance_view);
-        ValidateBounds(distance, size_t(0), size_t(1000000));
-        ReadToken(input, "to ");
-        string_view another_stop = ReadToken(input, ",");
-        stop.distances.push_back({string(another_stop), distance});
-    }
-}
-void AddStopRequest::ParseFromJson(const Node& node)
-{
-    auto& dict = node.AsMap();
-    stop.name = dict.at("name").AsString();
-    stop.coords.latitude = dict.at("latitude").AsDouble();
-    stop.coords.longitude = dict.at("longitude").AsDouble();
-    for (const auto& [stop_name_node, distance] : dict.at("road_distances").AsMap()) {
-        stop.distances.push_back({stop_name_node, distance.AsInt()});
-    }
-}
-void AddStopRequest::Process(Server& manager) const
-{
-    manager.AddStop(move(stop));
-}
-
-void AddRouteSettingsRequest::ParseFrom(string_view input)
-{
-}
-void AddRouteSettingsRequest::ParseFromJson(const Node& node)
-{
-    const auto settings_map = node.AsMap();
-    settings = RoutingSettings(settings_map.at("bus_wait_time").AsInt(),
-                               settings_map.at("bus_velocity").AsDouble());
-}
-void AddRouteSettingsRequest::Process(Server& manager) const
-{
-    manager.AddRouteSettings(move(settings));
-}
-
-void BusInfoRequest::ParseFrom(string_view input)
-{
-    ReadToken(input);
-    bus_name = Rstrip(input);
-}
-void BusInfoRequest::ParseFromJson(const Node& node)
-{
-    auto& dict = node.AsMap();
-    request_id = dict.at("id").AsInt();
-    bus_name = dict.at("name").AsString();
-}
-ResponsePtr BusInfoRequest::Process(const Server& manager) const
-{
-    return manager.BusInfo(request_id, move(bus_name));
-}
-
-void StopInfoRequest::ParseFrom(string_view input)
-{
-    ReadToken(input);
-    stop_name = Rstrip(input);
-}
-void StopInfoRequest::ParseFromJson(const Node& node)
-{
-    auto& dict = node.AsMap();
-    request_id = dict.at("id").AsInt();
-    stop_name = dict.at("name").AsString();
-}
-ResponsePtr StopInfoRequest::Process(const Server& manager) const
-{
-    return manager.StopInfo(request_id, move(stop_name));
-}
-
-void RouteInfoRequest::ParseFrom(string_view input)
-{
-//    ReadToken(input);
-//    stop_name = Rstrip(input);
-}
-void RouteInfoRequest::ParseFromJson(const Node& node)
-{
-    auto& dict = node.AsMap();
-    request_id = dict.at("id").AsInt();
-    path.from = dict.at("from").AsString();
-    path.to = dict.at("to").AsString();
-}
-ResponsePtr RouteInfoRequest::Process(const Server& manager) const
-{
-    return manager.RouteInfo(request_id, path);
-}
-
-optional<Request::Type> ConvertRequestTypeFromString(string_view request_str)
-{
-    string_view first_word = ReadToken(request_str);
-    if (first_word == "Bus") {
-        if (request_str.find(':') == request_str.npos) {
-            return Request::Type::BUS_INFO;
-        } else {
-            return Request::Type::ADD_BUS;
-        }
-    } else if (first_word == "Stop") {
-        if (request_str.find(':') == request_str.npos) {
-            return Request::Type::STOP_INFO;
-        } else {
-            return Request::Type::ADD_STOP;
+    RequestPtr Request::Create(Type type)
+    {
+        switch (type) {
+        case Type::ADD_ROUTE_SETTINGS:
+            return make_unique<AddRouteSettingsRequest>();
+        case Type::ADD_BUS:
+            return make_unique<AddBusRequest>();
+        case Type::ADD_STOP:
+            return make_unique<AddStopRequest>();
+        case Type::BUS_INFO:
+            return make_unique<BusInfoRequest>();
+        case Type::STOP_INFO:
+            return make_unique<StopInfoRequest>();
+        case Type::ROUTE_INFO:
+            return make_unique<RouteInfoRequest>();
+        default:
+            return nullptr;
         }
     }
 
-    return nullopt;
-}
-
-RequestPtr ParseRequest(string_view request_str)
-{
-    const auto request_type = ConvertRequestTypeFromString(request_str);
-    if (!request_type) {
-        return nullptr;
-    }
-    RequestPtr request = Request::Create(*request_type);
-    if (request) {
-        request->ParseFrom(request_str);
-    };
-    return request;
-}
-
-vector<RequestPtr> ReadRequests(istream& in_stream)
-{
-    vector<RequestPtr> requests;
-
-    const size_t update_request_count = ReadNumberOnLine<size_t>(in_stream);
-    requests.reserve(update_request_count);
-
-    for (size_t i = 0; i < update_request_count; ++i) {
-        string request_str;
-        getline(in_stream, request_str);
-        if (auto request = ParseRequest(request_str)) {
-            requests.push_back(move(request));
+    void AddBusRequest::ParseFrom(const Node& node)
+    {
+        auto& dict = node.AsMap();
+        bus.name = dict.at("name").AsString();
+        for (const auto& stop_name_node : dict.at("stops").AsArray()) {
+            bus.stops.push_back(stop_name_node.AsString());
+        }
+        if (!dict.at("is_roundtrip").AsBool()) {
+            for (int i = static_cast<int>(bus.stops.size()) - 2; i >= 0; --i) {
+                bus.stops.push_back(bus.stops[i]);
+            }
         }
     }
-
-    return requests;
-}
-
-optional<Request::Type> ConvertRequestTypeFromJson(const Json::Node& node, bool is_update_request)
-{
-    string_view type = node.AsMap().at("type").AsString();
-    if (type == "Bus") {
-        if (is_update_request) {
-            return Request::Type::ADD_BUS;
-        } else {
-            return Request::Type::BUS_INFO;
-        }
-    } else if (type == "Stop") {
-        if (is_update_request) {
-            return Request::Type::ADD_STOP;
-        } else {
-            return Request::Type::STOP_INFO;
-        }
-    } else if (type == "Route") {
-        return Request::Type::ROUTE_INFO;
+    void AddBusRequest::Process(TransportManager& manager) const
+    {
+        manager.AddBus(move(bus));
     }
 
-    return nullopt;
-}
-
-RequestPtr ParseJsonRequest(const Json::Node& node, bool is_update_request)
-{
-    const auto request_type = ConvertRequestTypeFromJson(node, is_update_request);
-    if (!request_type) {
-        return nullptr;
+    void AddStopRequest::ParseFrom(const Node& node)
+    {
+        auto& dict = node.AsMap();
+        stop.name = dict.at("name").AsString();
+        stop.position.latitude = dict.at("latitude").AsDouble();
+        stop.position.longitude = dict.at("longitude").AsDouble();
+        for (const auto& [stop_name_node, distance] : dict.at("road_distances").AsMap()) {
+            stop.distances[stop_name_node] = distance.AsInt();
+        }
     }
-    RequestPtr request = Request::Create(*request_type);
-    if (request) {
-        request->ParseFromJson(node);
-    };
-    return request;
-}
+    void AddStopRequest::Process(TransportManager& manager) const
+    {
+        manager.AddStop(move(stop));
+    }
 
-RoutingSettings ReadJsonRoutingSettings(const Json::Node &node)
-{
-    const auto settings_map = node.AsMap().at("routing_settings").AsMap();
-    return {settings_map.at("bus_wait_time").AsInt(),
-            settings_map.at("bus_velocity").AsDouble()};
-}
+    void AddRouteSettingsRequest::ParseFrom(const Node& node)
+    {
+        const auto settings_map = node.AsMap();
+        settings = {settings_map.at("bus_wait_time").AsInt(),
+                    settings_map.at("bus_velocity").AsDouble()};
+    }
+    void AddRouteSettingsRequest::Process(TransportManager& manager) const
+    {
+        manager.AddRouteSettings(move(settings));
+    }
 
-std::vector<RequestPtr> ReadJsonRequests(const Node &node)
-{
-    vector<RequestPtr> requests;
-    if (node.AsMap().count("routing_settings") > 0) {
-        RequestPtr request = Request::Create(Request::Type::ADD_ROUTE_SETTINGS);
+    void BusInfoRequest::ParseFrom(const Node& node)
+    {
+        auto& dict = node.AsMap();
+        request_id = dict.at("id").AsInt();
+        bus_name = dict.at("name").AsString();
+    }
+    ResponsePtr BusInfoRequest::Process(const TransportManager& manager) const
+    {
+        return manager.BusInfo(request_id, move(bus_name));
+    }
+
+    void StopInfoRequest::ParseFrom(const Node& node)
+    {
+        auto& dict = node.AsMap();
+        request_id = dict.at("id").AsInt();
+        stop_name = dict.at("name").AsString();
+    }
+    ResponsePtr StopInfoRequest::Process(const TransportManager& manager) const
+    {
+        return manager.StopInfo(request_id, move(stop_name));
+    }
+
+    void RouteInfoRequest::ParseFrom(const Node& node)
+    {
+        auto& dict = node.AsMap();
+        request_id = dict.at("id").AsInt();
+        path.from = dict.at("from").AsString();
+        path.to = dict.at("to").AsString();
+    }
+    ResponsePtr RouteInfoRequest::Process(const TransportManager& manager) const
+    {
+        return manager.RouteInfo(request_id, path);
+    }
+
+    optional<Type> ConvertRequestTypeFromJson(const Json::Node& node, bool is_update_request)
+    {
+        string_view type = node.AsMap().at("type").AsString();
+        if (type == "Bus") {
+            if (is_update_request) {
+                return Type::ADD_BUS;
+            } else {
+                return Type::BUS_INFO;
+            }
+        } else if (type == "Stop") {
+            if (is_update_request) {
+                return Type::ADD_STOP;
+            } else {
+                return Type::STOP_INFO;
+            }
+        } else if (type == "Route") {
+            return Type::ROUTE_INFO;
+        }
+
+        return nullopt;
+    }
+
+    RequestPtr ParseRequest(const Json::Node& node, bool is_update_request)
+    {
+        const auto request_type = ConvertRequestTypeFromJson(node, is_update_request);
+        if (!request_type) {
+            return nullptr;
+        }
+        RequestPtr request = Request::Create(*request_type);
         if (request) {
-            request->ParseFromJson(node.AsMap().at("routing_settings"));
+            request->ParseFrom(node);
         };
-        requests.push_back(move(request));
+        return request;
     }
 
-    vector<Node> json_update_requests = node.AsMap().at("base_requests").AsArray();
-    requests.reserve(requests.size());
-    for (const auto& json_node : json_update_requests) {
-        if (auto request = ParseJsonRequest(json_node, true)) {
+    RoutingSettings ReadRoutingSettings(const Json::Node &node)
+    {
+        const auto settings_map = node.AsMap().at("routing_settings").AsMap();
+        return {settings_map.at("bus_wait_time").AsInt(),
+                settings_map.at("bus_velocity").AsDouble()};
+    }
+
+    std::vector<RequestPtr> ReadRequests(const Node &node)
+    {
+        vector<RequestPtr> requests;
+        if (node.AsMap().count("routing_settings") > 0) {
+            RequestPtr request = Request::Create(Type::ADD_ROUTE_SETTINGS);
+            if (request) {
+                request->ParseFrom(node.AsMap().at("routing_settings"));
+            };
             requests.push_back(move(request));
         }
-    }
 
-    vector<Node> json_read_requests = node.AsMap().at("stat_requests").AsArray();
-    requests.reserve(requests.size() + json_read_requests.size());
-    for (const auto& json_node : json_read_requests) {
-        if (auto request = ParseJsonRequest(json_node, false)) {
-            requests.push_back(move(request));
+        vector<Node> json_update_requests = node.AsMap().at("base_requests").AsArray();
+        requests.reserve(requests.size());
+        for (const auto& json_node : json_update_requests) {
+            if (auto request = ParseRequest(json_node, true)) {
+                requests.push_back(move(request));
+            }
         }
-    }
 
-    return requests;
-}
-
-vector<ResponsePtr> ProcessRequests(Server& manager, const vector<RequestPtr>& requests)
-{
-    vector<ResponsePtr> responses;
-    for (const auto& request_holder : requests) {
-        try {
-            const auto& request = dynamic_cast<const ReadRequest&>(*request_holder);
-            responses.push_back(request.Process(manager));
-        } catch (const bad_cast& e) {
-            const auto& request = dynamic_cast<const UpdateRequest&>(*request_holder);
-            request.Process(manager);
+        vector<Node> json_read_requests = node.AsMap().at("stat_requests").AsArray();
+        requests.reserve(requests.size() + json_read_requests.size());
+        for (const auto& json_node : json_read_requests) {
+            if (auto request = ParseRequest(json_node, false)) {
+                requests.push_back(move(request));
+            }
         }
+
+        return requests;
     }
-    return responses;
-}
 
-ostream& operator<<(ostream& out_stream, const Request::Type& type)
-{
-    return out_stream << static_cast<int>(type);
-}
+    vector<ResponsePtr> ProcessRequests(TransportManager& manager, const vector<RequestPtr>& requests)
+    {
+        vector<ResponsePtr> responses;
+        for (const auto& request_holder : requests) {
+            try {
+                const auto& request = dynamic_cast<const ReadRequest&>(*request_holder);
+                responses.push_back(request.Process(manager));
+            } catch (const bad_cast& e) {
+                const auto& request = dynamic_cast<const UpdateRequest&>(*request_holder);
+                request.Process(manager);
+            }
+        }
+        return responses;
+    }
 
+    ostream& operator<<(ostream& out_stream, const Type& type)
+    {
+        return out_stream << static_cast<int>(type);
+    }
+
+}

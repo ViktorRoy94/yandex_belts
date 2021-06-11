@@ -81,15 +81,15 @@ double StopManager::ComputeRealLength(const StopNames& stop_names) const
     return total_length;
 }
 
-void Server::AddBus(BusData bus)
+void TransportManager::AddBus(BusData bus)
 {
     bus_manager_.AddBus(move(bus));
 }
-void Server::AddStop(StopData stop)
+void TransportManager::AddStop(StopData stop)
 {
     stop_manager_.AddStop(move(stop));
 }
-ResponsePtr Server::BusInfo(size_t request_id, string bus_name) const
+ResponsePtr TransportManager::BusInfo(size_t request_id, string bus_name) const
 {
     BusStat stats;
     stats.bus_name = move(bus_name);
@@ -107,7 +107,7 @@ ResponsePtr Server::BusInfo(size_t request_id, string bus_name) const
     return make_unique<BusInfoResponse>(request_id, move(stats));
 }
 
-ResponsePtr Server::StopInfo(size_t request_id, string stop_name) const
+ResponsePtr TransportManager::StopInfo(size_t request_id, string stop_name) const
 {
     StopStat stats;
     stats.stop_name = move(stop_name);

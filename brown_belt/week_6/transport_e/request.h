@@ -1,5 +1,9 @@
 #pragma once
 
+#include "manager.h"
+#include "data_types.h"
+#include "json.h"
+
 #include <exception>
 #include <iostream>
 #include <memory>
@@ -7,16 +11,11 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include <vector>
 
-#include "manager.h"
-#include "data_types.h"
-#include "json.h"
+namespace Request {
+    struct Request;
+    using RequestPtr = std::unique_ptr<Request>;
 
-struct Request;
-using RequestPtr = std::unique_ptr<Request>;
-
-struct Request {
     enum class Type {
         ADD_ROUTE_SETTINGS,
         ADD_STOP,
@@ -26,99 +25,90 @@ struct Request {
         ROUTE_INFO
     };
 
-    Request(Type type) : type(type) {}
-    static RequestPtr Create(Type type);
-    virtual void ParseFrom(std::string_view input) = 0;
-    virtual void ParseFromJson(const Json::Node& node) = 0;
-    virtual ~Request() = default;
+    struct Request {
+        Request(Type type) : type(type) {}
+        static RequestPtr Create(Type type);
+        virtual void ParseFrom(const Json::Node& node) = 0;
+        virtual ~Request() = default;
 
-    const Type type;
-};
+        const Type type;
+    };
 
-struct ReadRequest : Request {
-    using Request::Request;
-    virtual ResponsePtr Process(const Server& manager) const = 0;
+    struct ReadRequest : Request {
+        using Request::Request;
+        virtual Response::ResponsePtr Process(const TransportManager& manager) const = 0;
 
-    size_t request_id;
-};
+        size_t request_id;
+    };
 
-struct UpdateRequest : Request {
-    using Request::Request;
+    struct UpdateRequest : Request {
+        using Request::Request;
 
-    virtual void Process(Server& manager) const = 0;
-};
+        virtual void Process(TransportManager& manager) const = 0;
+    };
 
-struct AddBusRequest : UpdateRequest {
-    AddBusRequest() : UpdateRequest(Type::ADD_BUS) {}
-    void ParseFrom(std::string_view input) override;
-    void ParseFromJson(const Json::Node& node) override;
+    struct AddBusRequest : UpdateRequest {
+        AddBusRequest() : UpdateRequest(Type::ADD_BUS) {}
+        void ParseFrom(const Json::Node& node) override;
 
-    void Process(Server& manager) const override;
+        void Process(TransportManager& manager) const override;
 
-    BusData bus;
-};
+        Data::Bus bus;
+    };
 
-struct AddStopRequest : UpdateRequest {
-    AddStopRequest() : UpdateRequest(Type::ADD_STOP) {}
-    void ParseFrom(std::string_view input) override;
-    void ParseFromJson(const Json::Node& node) override;
+    struct AddStopRequest : UpdateRequest {
+        AddStopRequest() : UpdateRequest(Type::ADD_STOP) {}
+        void ParseFrom(const Json::Node& node) override;
 
-    void Process(Server& manager) const override;
+        void Process(TransportManager& manager) const override;
 
-    StopData stop;
-};
+        Data::Stop stop;
+    };
 
-struct AddRouteSettingsRequest : UpdateRequest {
-    AddRouteSettingsRequest() : UpdateRequest(Type::ADD_ROUTE_SETTINGS) {}
-    void ParseFrom(std::string_view input) override;
-    void ParseFromJson(const Json::Node& node) override;
+    struct AddRouteSettingsRequest : UpdateRequest {
+        AddRouteSettingsRequest() : UpdateRequest(Type::ADD_ROUTE_SETTINGS) {}
+        void ParseFrom(const Json::Node& node) override;
 
-    void Process(Server& manager) const override;
+        void Process(TransportManager& manager) const override;
 
-    RoutingSettings settings;
-};
+        RoutingSettings settings;
+    };
 
-struct BusInfoRequest : ReadRequest {
-    BusInfoRequest() : ReadRequest(Type::BUS_INFO) {}
-    void ParseFrom(std::string_view input) override;
-    void ParseFromJson(const Json::Node& node) override;
+    struct BusInfoRequest : ReadRequest {
+        BusInfoRequest() : ReadRequest(Type::BUS_INFO) {}
+        void ParseFrom(const Json::Node& node) override;
 
-    ResponsePtr Process(const Server& manager) const override;
+        Response::ResponsePtr Process(const TransportManager& manager) const override;
 
-    std::string bus_name;
-};
+        std::string bus_name;
+    };
 
-struct StopInfoRequest : ReadRequest {
-    StopInfoRequest() : ReadRequest(Type::STOP_INFO) {}
-    void ParseFrom(std::string_view input) override;
-    void ParseFromJson(const Json::Node& node) override;
+    struct StopInfoRequest : ReadRequest {
+        StopInfoRequest() : ReadRequest(Type::STOP_INFO) {}
+        void ParseFrom(const Json::Node& node) override;
 
-    ResponsePtr Process(const Server& manager) const override;
+        Response::ResponsePtr Process(const TransportManager& manager) const override;
 
-    std::string stop_name;
-};
+        std::string stop_name;
+    };
 
-struct RouteInfoRequest : ReadRequest {
-    RouteInfoRequest() : ReadRequest(Type::ROUTE_INFO) {}
-    void ParseFrom(std::string_view input) override;
-    void ParseFromJson(const Json::Node& node) override;
+    struct RouteInfoRequest : ReadRequest {
+        RouteInfoRequest() : ReadRequest(Type::ROUTE_INFO) {}
+        void ParseFrom(const Json::Node& node) override;
 
-    ResponsePtr Process(const Server& manager) const override;
+        Response::ResponsePtr Process(const TransportManager& manager) const override;
 
-    Path path;
-};
+        Path path;
+    };
 
-RequestPtr ParseRequest(std::string_view request_str);
+    RequestPtr ParseRequest(const Json::Node &node, bool is_update_request);
 
-std::vector<RequestPtr> ReadRequests(std::istream& in_stream = std::cin);
+    RoutingSettings ReadRoutingSettings(const Json::Node &node);
 
-RequestPtr ParseJsonRequest(const Json::Node &node, bool is_update_request);
+    std::vector<RequestPtr> ReadRequests(const Json::Node &node);
 
-RoutingSettings ReadJsonRoutingSettings(const Json::Node &node);
+    std::vector<Response::ResponsePtr> ProcessRequests(TransportManager& manager,
+                                                       const std::vector<RequestPtr>& requests);
 
-std::vector<RequestPtr> ReadJsonRequests(const Json::Node &node);
-
-std::vector<ResponsePtr> ProcessRequests(Server& manager,
-                                         const std::vector<RequestPtr>& requests);
-
-std::ostream& operator<<(std::ostream& out_stream, const Request::Type& type);
+    std::ostream& operator<<(std::ostream& out_stream, const Type& type);
+}

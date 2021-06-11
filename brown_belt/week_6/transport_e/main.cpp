@@ -1,11 +1,16 @@
 #include "request.h"
 #include "test_runner.h"
 #include "profile.h"
+#include "geo.h"
 
 #include <fstream>
 
 using namespace std;
 using namespace Json;
+using namespace Geo;
+using namespace Request;
+using namespace Response;
+
 
 bool CompareResponseJsonStrings(std::string str1, std::string str2) {
     istringstream input1(str1);
@@ -27,171 +32,12 @@ bool CompareResponseJsonStrings(std::string str1, std::string str2) {
             result = result && map1.at("request_id").AsInt() == map2.at("request_id").AsInt();
             double time_diff = abs(map1.at("total_time").AsDouble() -
                                    map2.at("total_time").AsDouble());
-            result = result && time_diff < 0.01;
+            result = result && time_diff < 0.005;
+            if (!result)
+                return result;
         }
     }
     return result;
-}
-
-void TestAddBusRequestParseFrom() {
-    {
-        AddBusRequest request;
-        request.ParseFrom("Bus 256: Biryulyovo Zapadnoye > Biryusinka > Universam > Biryulyovo Zapadnoye\n");
-        ASSERT_EQUAL(request.bus.name, "256");
-        ASSERT_EQUAL(request.bus.is_circle_path, true);
-        ASSERT_EQUAL(request.bus.stops, vector<string>({"Biryulyovo Zapadnoye",
-                                                    "Biryusinka",
-                                                    "Universam",
-                                                    "Biryulyovo Zapadnoye"}));
-    }
-    {
-        AddBusRequest request;        request.ParseFrom("Bus 750: Tolstopaltsevo - Marushkino - Rasskazovka ");
-        ASSERT_EQUAL(request.bus.name, "750");
-        ASSERT_EQUAL(request.bus.is_circle_path, false);
-        ASSERT_EQUAL(request.bus.stops, vector<string>({"Tolstopaltsevo",
-                                                    "Marushkino",
-                                                    "Rasskazovka"}));
-    }
-}
-
-void TestAddStopRequestParseFrom() {
-    {
-        AddStopRequest request;
-        request.ParseFrom("Stop Tolstopaltsevo: 55.611087, 37.20829\n");
-        ASSERT_EQUAL(request.stop.name, "Tolstopaltsevo");
-        ASSERT_EQUAL(request.stop.coords, Coordinates({55.611087, 37.20829}));
-    }
-    {
-        AddStopRequest request;
-        request.ParseFrom("Stop Marushkino: 55.595884, 37.209755 ");
-        ASSERT_EQUAL(request.stop.name, "Marushkino");
-        ASSERT_EQUAL(request.stop.coords, Coordinates({55.595884, 37.209755}));
-    }
-    {
-        AddStopRequest request;
-        request.ParseFrom("Stop Tolstopaltsevo: 55.611087, 37.20829, 3900m to Marushkino\n");
-        ASSERT_EQUAL(request.stop.name, "Tolstopaltsevo");
-        ASSERT_EQUAL(request.stop.coords, Coordinates({55.611087, 37.20829}));
-        ASSERT_EQUAL(request.stop.distances[0].first, "Marushkino");
-        ASSERT_EQUAL(request.stop.distances[0].second, 3900u);
-    }
-    {
-        AddStopRequest request;
-        request.ParseFrom("Stop Biryulyovo Zapadnoye: 55.574371, 37.6517, 7500m to Rossoshanskaya ulitsa, 1800m to Biryusinka, 2400m to Universam\n");
-        ASSERT_EQUAL(request.stop.name, "Biryulyovo Zapadnoye");
-        ASSERT_EQUAL(request.stop.coords, Coordinates({55.574371, 37.6517}));
-        ASSERT_EQUAL(request.stop.distances[0].first, "Rossoshanskaya ulitsa");
-        ASSERT_EQUAL(request.stop.distances[0].second, 7500u);
-        ASSERT_EQUAL(request.stop.distances[1].first, "Biryusinka");
-        ASSERT_EQUAL(request.stop.distances[1].second, 1800u);
-        ASSERT_EQUAL(request.stop.distances[2].first, "Universam");
-        ASSERT_EQUAL(request.stop.distances[2].second, 2400u);
-    }
-}
-
-void TestBusInfoRequestParseFrom() {
-    {
-        BusInfoRequest request;
-        request.ParseFrom("Bus 256");
-        ASSERT_EQUAL(request.bus_name, "256");
-    }
-    {
-        BusInfoRequest request;
-        request.ParseFrom("Bus 750\n");
-        ASSERT_EQUAL(request.bus_name, "750");
-    }
-    {
-        BusInfoRequest request;
-        request.ParseFrom("Bus three word bus 750\n");
-        ASSERT_EQUAL(request.bus_name, "three word bus 750");
-    }
-}
-
-void TestStopInfoRequestParseFrom() {
-    {
-        StopInfoRequest request;
-        request.ParseFrom("Stop Biryulyovo Zapadnoye");
-        ASSERT_EQUAL(request.stop_name, "Biryulyovo Zapadnoye");
-    }
-    {
-        StopInfoRequest request;
-        request.ParseFrom("Stop Prazhskaya\n");
-        ASSERT_EQUAL(request.stop_name, "Prazhskaya");
-    }
-    {
-        StopInfoRequest request;
-        request.ParseFrom("Stop three word stop\n");
-        ASSERT_EQUAL(request.stop_name, "three word stop");
-    }
-}
-
-void TestParseRequest() {
-    {
-        string request_str = "Bus 256: Biryulyovo Zapadnoye > Biryusinka > Universam";
-        RequestPtr request = ParseRequest(request_str);
-        ASSERT_EQUAL(request->type, Request::Type::ADD_BUS);
-    }
-    {
-        string request_str = "Stop Tolstopaltsevo: 55.611087, 37.20829";
-        RequestPtr request = ParseRequest(request_str);
-        ASSERT_EQUAL(request->type, Request::Type::ADD_STOP);
-    }
-    {
-        string request_str = "Bus 256";
-        RequestPtr request = ParseRequest(request_str);
-        ASSERT_EQUAL(request->type, Request::Type::BUS_INFO);
-    }
-    {
-        string request_str = "Stop Tolstopaltsevo";
-        RequestPtr request = ParseRequest(request_str);
-        ASSERT_EQUAL(request->type, Request::Type::STOP_INFO);
-    }
-}
-
-void TestReadRequests() {
-    {
-        istringstream input("3\n"
-                            "Stop Tolstopaltsevo: 55.611087, 37.20829\n"
-                            "Stop Marushkino: 55.595884, 37.209755\n"
-                            "Bus 750: Tolstopaltsevo - Marushkino - Rasskazovka\n"
-                            "3\n"
-                            "Bus 256\n"
-                            "Bus 750\n"
-                            "Bus 751\n");
-        const auto requests = ReadRequests(input);
-        ASSERT_EQUAL(requests.size(), 3u);
-        ASSERT_EQUAL(requests[0]->type, Request::Type::ADD_STOP);
-        ASSERT_EQUAL(requests[1]->type, Request::Type::ADD_STOP);
-        ASSERT_EQUAL(requests[2]->type, Request::Type::ADD_BUS);
-    }
-}
-
-void TestPrintResponse() {
-    {
-        BusInfoResponse response(0, {"256", 6, 5, 5950, 1.361239});
-        ostringstream output;
-        output.precision(7);
-        response.Print(output);
-        ASSERT_EQUAL(output.str(), "Bus 256: 6 stops on route, 5 unique stops, 5950 route length, 1.361239 curvature\n");
-    }
-    {
-        StopInfoResponse response(1, {"256", set<string>({"111", "121"}), ""});
-        ostringstream output;
-        response.Print(output);
-        ASSERT_EQUAL(output.str(), "Stop 256: buses 111 121\n");
-    }
-    {
-        StopInfoResponse response(2, {"256", {}, ""});
-        ostringstream output;
-        response.Print(output);
-        ASSERT_EQUAL(output.str(), "Stop 256: no buses\n");
-    }
-    {
-        StopInfoResponse response(3, {"256", {}, "not found"});
-        ostringstream output;
-        response.Print(output);
-        ASSERT_EQUAL(output.str(), "Stop 256: not found\n");
-    }
 }
 
 void TestJson() {
@@ -248,9 +94,9 @@ void TestJsonCompare() {
 void TestParseJsonRoutingSettings() {
     istringstream input(R"({"routing_settings": {"bus_wait_time": 6, "bus_velocity": 40}})");
     Node node = Load(input).GetRoot();
-    RoutingSettings settings = ReadJsonRoutingSettings(node);
+    RoutingSettings settings = ReadRoutingSettings(node);
     ASSERT_EQUAL(settings.bus_wait_time, 6);
-    ASSERT(abs(settings.bus_velocity - 666.66666) < 0.0001);
+    ASSERT_EQUAL(settings.bus_velocity, 40);
 }
 
 void TestAddBusRequestParseFromJson() {
@@ -269,9 +115,8 @@ void TestAddBusRequestParseFromJson() {
 
         Node node = Load(input).GetRoot();
         AddBusRequest request;
-        request.ParseFromJson(node);
+        request.ParseFrom(node);
         ASSERT_EQUAL(request.bus.name, "828");
-        ASSERT_EQUAL(request.bus.is_circle_path, true);
         ASSERT_EQUAL(request.bus.stops, vector<string>({"Biryulyovo Zapadnoye",
                                                         "Universam",
                                                         "Rossoshanskaya ulitsa",
@@ -291,24 +136,26 @@ void TestAddBusRequestParseFromJson() {
 
         Node node = Load(input).GetRoot();
         AddBusRequest request;
-        request.ParseFromJson(node);
+        request.ParseFrom(node);
         ASSERT_EQUAL(request.bus.name, "750");
-        ASSERT_EQUAL(request.bus.is_circle_path, false);
         ASSERT_EQUAL(request.bus.stops, vector<string>({"Tolstopaltsevo",
                                                         "Marushkino",
-                                                        "Rasskazovka"}));
+                                                        "Rasskazovka",
+                                                        "Marushkino",
+                                                        "Tolstopaltsevo"}));
     }
     {
         istringstream input(R"({ "type": "Bus", "name": "750", "stops": [ "Tolstopaltsevo", "Marushkino", "Rasskazovka" ], "is_roundtrip": false })");
 
         Node node = Load(input).GetRoot();
         AddBusRequest request;
-        request.ParseFromJson(node);
+        request.ParseFrom(node);
         ASSERT_EQUAL(request.bus.name, "750");
-        ASSERT_EQUAL(request.bus.is_circle_path, false);
         ASSERT_EQUAL(request.bus.stops, vector<string>({"Tolstopaltsevo",
                                                         "Marushkino",
-                                                        "Rasskazovka"}));
+                                                        "Rasskazovka",
+                                                        "Marushkino",
+                                                        "Tolstopaltsevo"}));
     }
 }
 
@@ -326,11 +173,10 @@ void TestAddStopRequestParseFromJson() {
 
         Node node = Load(input).GetRoot();
         AddStopRequest request;
-        request.ParseFromJson(node);
+        request.ParseFrom(node);
         ASSERT_EQUAL(request.stop.name, "Tolstopaltsevo");
-        ASSERT_EQUAL(request.stop.coords, Coordinates({55.611087, 37.20829}));
-        ASSERT_EQUAL(request.stop.distances[0].first, "Marushkino");
-        ASSERT_EQUAL(request.stop.distances[0].second, 3900u);
+        ASSERT_EQUAL(request.stop.position, Coordinates({55.611087, 37.20829}));
+        ASSERT_EQUAL(request.stop.distances["Marushkino"], 3900u);
     }
     {
         istringstream input(R"({
@@ -344,11 +190,10 @@ void TestAddStopRequestParseFromJson() {
                                })");
         Node node = Load(input).GetRoot();
         AddStopRequest request;
-        request.ParseFromJson(node);
+        request.ParseFrom(node);
         ASSERT_EQUAL(request.stop.name, "Marushkino");
-        ASSERT_EQUAL(request.stop.coords, Coordinates({55.595884, 37.209755}));
-        ASSERT_EQUAL(request.stop.distances[0].first, "Rasskazovka");
-        ASSERT_EQUAL(request.stop.distances[0].second, 9900u);
+        ASSERT_EQUAL(request.stop.position, Coordinates({55.595884, 37.209755}));
+        ASSERT_EQUAL(request.stop.distances["Rasskazovka"], 9900u);
     }
 
 
@@ -365,13 +210,11 @@ void TestAddStopRequestParseFromJson() {
                                })");
         Node node = Load(input).GetRoot();
         AddStopRequest request;
-        request.ParseFromJson(node);
+        request.ParseFrom(node);
         ASSERT_EQUAL(request.stop.name, "Universam");
-        ASSERT_EQUAL(request.stop.coords, Coordinates({55.587655, 37.645687}));
-        ASSERT_EQUAL(request.stop.distances[0].first, "Biryulyovo Tovarnaya");
-        ASSERT_EQUAL(request.stop.distances[0].second, 900u);
-        ASSERT_EQUAL(request.stop.distances[1].first, "Rossoshanskaya ulitsa");
-        ASSERT_EQUAL(request.stop.distances[1].second, 5600u);
+        ASSERT_EQUAL(request.stop.position, Coordinates({55.587655, 37.645687}));
+        ASSERT_EQUAL(request.stop.distances["Biryulyovo Tovarnaya"], 900u);
+        ASSERT_EQUAL(request.stop.distances["Rossoshanskaya ulitsa"], 5600u);
     }
     {
         istringstream input(R"({
@@ -383,9 +226,9 @@ void TestAddStopRequestParseFromJson() {
                                })");
         Node node = Load(input).GetRoot();
         AddStopRequest request;
-        request.ParseFromJson(node);
+        request.ParseFrom(node);
         ASSERT_EQUAL(request.stop.name, "Rasskazovka");
-        ASSERT_EQUAL(request.stop.coords, Coordinates({55.632761, 37.333324}));
+        ASSERT_EQUAL(request.stop.position, Coordinates({55.632761, 37.333324}));
         ASSERT_EQUAL(request.stop.distances.size(), 0u);
     }
 }
@@ -400,7 +243,7 @@ void TestBusInfoRequestParseFromJson() {
 
         Node node = Load(input).GetRoot();
         BusInfoRequest request;
-        request.ParseFromJson(node);
+        request.ParseFrom(node);
         ASSERT_EQUAL(request.request_id, 1965312327u);
         ASSERT_EQUAL(request.bus_name, "256");
     }
@@ -413,7 +256,7 @@ void TestBusInfoRequestParseFromJson() {
 
         Node node = Load(input).GetRoot();
         BusInfoRequest request;
-        request.ParseFromJson(node);
+        request.ParseFrom(node);
         ASSERT_EQUAL(request.request_id, 519139350u);
         ASSERT_EQUAL(request.bus_name, "750");
     }
@@ -426,7 +269,7 @@ void TestBusInfoRequestParseFromJson() {
 
         Node node = Load(input).GetRoot();
         BusInfoRequest request;
-        request.ParseFromJson(node);
+        request.ParseFrom(node);
         ASSERT_EQUAL(request.request_id, 2147483647u);
         ASSERT_EQUAL(request.bus_name, "three word bus 750");
     }
@@ -442,7 +285,7 @@ void TestStopInfoRequestParseFromJson() {
 
         Node node = Load(input).GetRoot();
         StopInfoRequest request;
-        request.ParseFromJson(node);
+        request.ParseFrom(node);
         ASSERT_EQUAL(request.request_id, 746888088u);
         ASSERT_EQUAL(request.stop_name, "Samara");
 
@@ -456,7 +299,7 @@ void TestStopInfoRequestParseFromJson() {
 
         Node node = Load(input).GetRoot();
         StopInfoRequest request;
-        request.ParseFromJson(node);
+        request.ParseFrom(node);
         ASSERT_EQUAL(request.request_id, 65100610u);
         ASSERT_EQUAL(request.stop_name, "Prazhskaya");
     }
@@ -469,7 +312,7 @@ void TestStopInfoRequestParseFromJson() {
 
         Node node = Load(input).GetRoot();
         StopInfoRequest request;
-        request.ParseFromJson(node);
+        request.ParseFrom(node);
         ASSERT_EQUAL(request.request_id, 2147483647u);
         ASSERT_EQUAL(request.stop_name, "three word stop");
     }
@@ -486,7 +329,7 @@ void TestRouteInfoRequestParseFromJson() {
 
         Node node = Load(input).GetRoot();
         RouteInfoRequest request;
-        request.ParseFromJson(node);
+        request.ParseFrom(node);
         ASSERT_EQUAL(request.request_id, 4u);
         ASSERT_EQUAL(request.path.from, "Biryulyovo Zapadnoye");
         ASSERT_EQUAL(request.path.to, "Universam");
@@ -508,8 +351,8 @@ void TestParseJsonRequest() {
                                 })");
 
         Node node = Load(input).GetRoot();
-        RequestPtr request = ParseJsonRequest(node, true);
-        ASSERT_EQUAL(request->type, Request::Type::ADD_BUS);
+        RequestPtr request = ParseRequest(node, true);
+        ASSERT_EQUAL(request->type, Type::ADD_BUS);
     }
     {
         istringstream input(R"({
@@ -523,8 +366,8 @@ void TestParseJsonRequest() {
                                })");
 
         Node node = Load(input).GetRoot();
-        RequestPtr request = ParseJsonRequest(node, true);
-        ASSERT_EQUAL(request->type, Request::Type::ADD_STOP);
+        RequestPtr request = ParseRequest(node, true);
+        ASSERT_EQUAL(request->type, Type::ADD_STOP);
     }
     {
         istringstream input(R"({
@@ -533,8 +376,8 @@ void TestParseJsonRequest() {
                                   "id": 1965312327
                                })");
         Node node = Load(input).GetRoot();
-        RequestPtr request = ParseJsonRequest(node, false);
-        ASSERT_EQUAL(request->type, Request::Type::BUS_INFO);
+        RequestPtr request = ParseRequest(node, false);
+        ASSERT_EQUAL(request->type, Type::BUS_INFO);
     }
     {
         istringstream input(R"({
@@ -543,8 +386,8 @@ void TestParseJsonRequest() {
                                   "id": 1965312327
                                })");
         Node node = Load(input).GetRoot();
-        RequestPtr request = ParseJsonRequest(node, false);
-        ASSERT_EQUAL(request->type, Request::Type::STOP_INFO);
+        RequestPtr request = ParseRequest(node, false);
+        ASSERT_EQUAL(request->type, Type::STOP_INFO);
     }
 }
 
@@ -603,14 +446,14 @@ void TestReadJsonRequests() {
                                })");
 
         Document doc = Load(input);
-        const auto requests = ReadJsonRequests(doc.GetRoot());
+        const auto requests = ReadRequests(doc.GetRoot());
         ASSERT_EQUAL(requests.size(), 6u);
-        ASSERT_EQUAL(requests[0]->type, Request::Type::ADD_ROUTE_SETTINGS);
-        ASSERT_EQUAL(requests[1]->type, Request::Type::ADD_STOP);
-        ASSERT_EQUAL(requests[2]->type, Request::Type::ADD_STOP);
-        ASSERT_EQUAL(requests[3]->type, Request::Type::ADD_BUS);
-        ASSERT_EQUAL(requests[4]->type, Request::Type::BUS_INFO);
-        ASSERT_EQUAL(requests[5]->type, Request::Type::STOP_INFO);
+        ASSERT_EQUAL(requests[0]->type, Type::ADD_ROUTE_SETTINGS);
+        ASSERT_EQUAL(requests[1]->type, Type::ADD_STOP);
+        ASSERT_EQUAL(requests[2]->type, Type::ADD_STOP);
+        ASSERT_EQUAL(requests[3]->type, Type::ADD_BUS);
+        ASSERT_EQUAL(requests[4]->type, Type::BUS_INFO);
+        ASSERT_EQUAL(requests[5]->type, Type::STOP_INFO);
     }
 }
 
@@ -651,6 +494,7 @@ void TestPrintJsonResponse() {
         ASSERT_EQUAL(output.str(), R"({"request_id": 1042838872, "error_message": "not found"})");
     }
     {
+        using namespace Statistic;
         RouteItemPtr item1 = make_unique<WaitItem>("Biryulyovo", 6);
         RouteItemPtr item2 = make_unique<BusItem>("297", 2, 5.235);
         std::vector<RouteItemPtr> items(2);
@@ -673,8 +517,9 @@ void TestPrintJsonResponse() {
 
 void TestPrintResponcesInJsonFormat() {
     {
-        BusStat bus_stat = {"750", 6, 5, 5950, 1.361239, "not found"};
-        StopStat stop_stat = {"256", set<string>({"256", "828"}), ""};
+        using namespace Statistic;
+        Bus bus_stat = {"750", 6, 5, 5950, 1.361239, "not found"};
+        Stop stop_stat = {"256", set<string>({"256", "828"}), ""};
         vector<ResponsePtr> responses(2);
         responses[0] = make_unique<BusInfoResponse>(1965312327, bus_stat);
         responses[1] = make_unique<StopInfoResponse>(1042838872, stop_stat);
@@ -687,6 +532,7 @@ void TestPrintResponcesInJsonFormat() {
 
 void TestPrintWaitItem() {
     {
+        using namespace Statistic;
         WaitItem item = {"Biryulyovo", 6.0};
         ostringstream output;
         item.PrintJson(output);
@@ -696,6 +542,7 @@ void TestPrintWaitItem() {
 
 void TestPrintBusItem() {
     {
+        using namespace Statistic;
         BusItem item = {"297", 2, 5.235};
         ostringstream output;
         item.PrintJson(output);
@@ -707,13 +554,13 @@ void TestLengthBetweenCoords() {
     {
         Coordinates coord1 = {55.611087, 37.20829};
         Coordinates coord2 = {55.595884, 37.209755};
-        double length = LengthBetwenCoords(coord1, coord2);
+        double length = Distance(coord1, coord2);
         ASSERT(abs(length - 1692.99) < 0.01);
     }
     {
         Coordinates coord1 = {56.326797, 44.006516};
         Coordinates coord2 = {55.755819, 37.617644};
-        double length = LengthBetwenCoords(coord1, coord2);
+        double length = Distance(coord1, coord2);
         ASSERT(abs(length - 401726.39) < 0.01);
     }
 }
@@ -724,27 +571,29 @@ void TestBusManager() {
         manager.AddBus({"256", {"Biryulyovo Zapadnoye",
                                "Biryusinka",
                                "Universam",
-                               "Biryulyovo Zapadnoye"}, true});
+                               "Biryulyovo Zapadnoye"}});
         manager.AddBus({"750", {"Tolstopaltsevo",
                                "Marushkino",
-                               "Rasskazovka"}, false});
-        ASSERT_EQUAL(manager.GetBusStops("256"), vector<string>({"Biryulyovo Zapadnoye",
-                                                                 "Biryusinka",
-                                                                 "Universam",
-                                                                 "Biryulyovo Zapadnoye"}));
-        ASSERT_EQUAL(manager.GetBusStops("750"), vector<string>({"Tolstopaltsevo",
-                                                                 "Marushkino",
-                                                                 "Rasskazovka",
-                                                                 "Marushkino",
-                                                                 "Tolstopaltsevo"}));
+                               "Rasskazovka",
+                               "Marushkino",
+                               "Tolstopaltsevo"}});
+        ASSERT_EQUAL(manager.GetBus("256").stops, vector<string>({"Biryulyovo Zapadnoye",
+                                                                  "Biryusinka",
+                                                                  "Universam",
+                                                                  "Biryulyovo Zapadnoye"}));
+        ASSERT_EQUAL(manager.GetBus("750").stops, vector<string>({"Tolstopaltsevo",
+                                                                  "Marushkino",
+                                                                  "Rasskazovka",
+                                                                  "Marushkino",
+                                                                  "Tolstopaltsevo"}));
     }
     {
         BusManager manager;
-        manager.AddBus({"256", {"1", "2", "3", "4"}, false});
-        manager.AddBus({"750", {"1", "2", "3", "4"}, false});
-        manager.AddBus({"111", {"4", "5", "6", "7"}, false});
-        ASSERT_EQUAL(manager.GetBusesForStop("1"), set<string>({"256", "750"}));
-        ASSERT_EQUAL(manager.GetBusesForStop("4"), set<string>({"256", "750", "111"}));
+        manager.AddBus({"256", {"1", "2", "3", "4", "3", "2", "1"}});
+        manager.AddBus({"750", {"1", "2", "3", "4", "3", "2", "1"}});
+        manager.AddBus({"111", {"4", "5", "6", "7", "6", "5", "4"}});
+        ASSERT_EQUAL(manager.GetStopBuses("1"), set<string>({"256", "750"}));
+        ASSERT_EQUAL(manager.GetStopBuses("4"), set<string>({"256", "750", "111"}));
     }
 }
 
@@ -764,9 +613,9 @@ void TestStopManager() {
                                                               "Marushkino",
                                                               "Rasskazovka",
                                                               "Biryulyovo Zapadnoye"}));
-        double result_length = LengthBetwenCoords(coord1, coord2) +
-                               LengthBetwenCoords(coord2, coord3) +
-                               LengthBetwenCoords(coord3, coord4);
+        double result_length = Distance(coord1, coord2) +
+                               Distance(coord2, coord3) +
+                               Distance(coord3, coord4);
         ASSERT(abs(length - result_length) < 0.0000001);
     }
     {
@@ -784,7 +633,7 @@ void TestStopManager() {
                                                                   "Rasskazovka",
                                                                   "Marushkino",
                                                                   "Tolstopaltsevo"}));
-        ASSERT(labs(length - 27600) < 1);
+        ASSERT((length - 27600u) < 1);
     }
 }
 
@@ -794,10 +643,12 @@ void TestRouteManager() {
         bus_manager.AddBus({"297", {"Biryulyovo Zapadnoye",
                                     "Biryulyovo Tovarnaya",
                                     "Universam",
-                                    "Biryulyovo Zapadnoye"}, true});
+                                    "Biryulyovo Zapadnoye"}});
         bus_manager.AddBus({"635", {"Biryulyovo Tovarnaya",
                                     "Universam",
-                                    "Prazhskaya"}, false});
+                                    "Prazhskaya",
+                                    "Universam",
+                                    "Biryulyovo Tovarnaya"}});
 
         StopManager stop_manager;
         stop_manager.AddStop({"Biryulyovo Zapadnoye", {}, {{"Biryulyovo Tovarnaya", 2600u}}});
@@ -807,9 +658,7 @@ void TestRouteManager() {
         stop_manager.AddStop({"Biryulyovo Tovarnaya", {}, {{"Universam", 890u}}});
         stop_manager.AddStop({"Prazhskaya", {}, {}});
 
-        RouteManager manager(bus_manager, stop_manager);
-        manager.UpdateRouteSettings(RoutingSettings(6, 40));
-        manager.Initialize();
+        RouteManager manager(bus_manager, stop_manager, {6, 40});
         {
             Path path = {"Biryulyovo Zapadnoye", "Universam"};
             auto route_items = manager.GetRoute(path).value();
@@ -822,15 +671,16 @@ void TestRouteManager() {
             ASSERT_EQUAL(manager.GetRouteTime(path).value(), 24.21);
             ASSERT_EQUAL(route_items.size(), 4u);
 
-            WaitItem* wait_item_1 = dynamic_cast<WaitItem*>(route_items[0].get());
-            BusItem* bus_item_2 = dynamic_cast<BusItem*>(route_items[1].get());
-            WaitItem* wait_item_3 = dynamic_cast<WaitItem*>(route_items[2].get());
-            BusItem* bus_item_4 = dynamic_cast<BusItem*>(route_items[3].get());
+            auto wait_item_1 = dynamic_cast<Statistic::WaitItem*>(route_items[0].get());
+            auto bus_item_2  = dynamic_cast<Statistic::BusItem*>(route_items[1].get());
+            auto wait_item_3 = dynamic_cast<Statistic::WaitItem*>(route_items[2].get());
+            auto bus_item_4  = dynamic_cast<Statistic::BusItem*>(route_items[3].get());
 
-            ASSERT_EQUAL(*wait_item_1, WaitItem("Biryulyovo Zapadnoye", 6.0));
-            ASSERT_EQUAL(*bus_item_2, BusItem("297", 2, 5.235));
-            ASSERT_EQUAL(*wait_item_3, WaitItem("Universam", 6.0));
-            ASSERT_EQUAL(*bus_item_4, BusItem("635", 1, 6.975));
+            ASSERT_EQUAL(*wait_item_1, Statistic::WaitItem("Biryulyovo Zapadnoye", 6.0));
+            ASSERT_EQUAL(*bus_item_2,  Statistic::BusItem("297", 1, 3.9));
+            ASSERT_EQUAL(*wait_item_3, Statistic::WaitItem("Biryulyovo Tovarnaya", 6.0));
+            ASSERT_EQUAL(*bus_item_4,  Statistic::BusItem("635", 2, 8.31));
+
         }
     }
     {
@@ -840,21 +690,32 @@ void TestRouteManager() {
                                     "Universam",
                                     "Biryusinka",
                                     "Apteka",
-                                    "Biryulyovo Zapadnoye"}, true});
+                                    "Biryulyovo Zapadnoye"}});
         bus_manager.AddBus({"635", {"Biryulyovo Tovarnaya",
                                     "Universam",
                                     "Biryusinka",
                                     "TETs 26",
                                     "Pokrovskaya",
-                                    "Prazhskaya"}, false});
+                                    "Prazhskaya",
+                                    "Pokrovskaya",
+                                    "TETs 26",
+                                    "Biryusinka",
+                                    "Universam",
+                                    "Biryulyovo Tovarnaya"}});
         bus_manager.AddBus({"828", {"Biryulyovo Zapadnoye",
                                     "TETs 26",
                                     "Biryusinka",
                                     "Universam",
                                     "Pokrovskaya",
-                                    "Rossoshanskaya ulitsa"}, false});
+                                    "Rossoshanskaya ulitsa",
+                                    "Pokrovskaya",
+                                    "Universam",
+                                    "Biryusinka",
+                                    "TETs 26",
+                                    "Biryulyovo Zapadnoye"}});
         bus_manager.AddBus({"750", {"Tolstopaltsevo",
-                                    "Rasskazovka"}, false});
+                                    "Rasskazovka",
+                                    "Tolstopaltsevo"}});
 
         StopManager stop_manager;
         stop_manager.AddStop({"Biryulyovo Zapadnoye", {}, {{"Biryulyovo Tovarnaya", 2600u},
@@ -873,9 +734,7 @@ void TestRouteManager() {
         stop_manager.AddStop({"Tolstopaltsevo", {}, {{"Rasskazovka", 13800u}}});
         stop_manager.AddStop({"Rasskazovka", {}, {}});
 
-        RouteManager manager(bus_manager, stop_manager);
-        manager.UpdateRouteSettings(RoutingSettings(2, 30));
-        manager.Initialize();
+        RouteManager manager(bus_manager, stop_manager, {2, 30});
         {
             Path path = {"Biryulyovo Zapadnoye", "Apteka"};
             auto route_items = manager.GetRoute(path).value();
@@ -897,7 +756,7 @@ void TestRouteManager() {
         {
             Path path = {"Biryulyovo Tovarnaya", "Biryulyovo Zapadnoye"};
             auto route_items = manager.GetRoute(path).value();
-            ASSERT_EQUAL(manager.GetRouteTime(path).value(), 8.56);
+            ASSERT(abs(manager.GetRouteTime(path).value() - 8.56) < 0.0001);
             ASSERT_EQUAL(route_items.size(), 2u);
         }
         {
@@ -926,7 +785,7 @@ void TestRouteManager() {
                                     "Lipetskaya ulitsa 40",
                                     "Lipetskaya ulitsa 46",
                                     "Moskvorechye",
-                                    "Zagorye"}, true});
+                                    "Zagorye"}});
         StopManager stop_manager;
         stop_manager.AddStop({"Zagorye", {}, {{"Lipetskaya ulitsa 46", 230u}}});
         stop_manager.AddStop({"Lipetskaya ulitsa 46", {}, {{"Lipetskaya ulitsa 40", 390u},
@@ -935,9 +794,7 @@ void TestRouteManager() {
                                                            {"Lipetskaya ulitsa 46", 380u}}});
         stop_manager.AddStop({"Moskvorechye", {}, {{"Zagorye", 10000u}}});
 
-        RouteManager manager(bus_manager, stop_manager);
-        manager.UpdateRouteSettings(RoutingSettings(2, 30));
-        manager.Initialize();
+        RouteManager manager(bus_manager, stop_manager, {2, 30});
         {
             Path path = {"Zagorye", "Moskvorechye"};
             auto route_items = manager.GetRoute(path).value();
@@ -959,49 +816,6 @@ void TestRouteManager() {
     }
 }
 
-void TestPipeline() {
-    istringstream input("13\n"
-                        "Stop Tolstopaltsevo: 55.611087, 37.20829, 3900m to Marushkino\n"
-                        "Stop Marushkino: 55.595884, 37.209755, 9900m to Rasskazovka\n"
-                        "Bus 256: Biryulyovo Zapadnoye > Biryusinka > Universam > Biryulyovo Tovarnaya > Biryulyovo Passazhirskaya > Biryulyovo Zapadnoye\n"
-                        "Bus 750: Tolstopaltsevo - Marushkino - Rasskazovka\n"
-                        "Stop Rasskazovka: 55.632761, 37.333324\n"
-                        "Stop Biryulyovo Zapadnoye: 55.574371, 37.6517, 7500m to Rossoshanskaya ulitsa, 1800m to Biryusinka, 2400m to Universam\n"
-                        "Stop Biryusinka: 55.581065, 37.64839, 750m to Universam\n"
-                        "Stop Universam: 55.587655, 37.645687, 5600m to Rossoshanskaya ulitsa, 900m to Biryulyovo Tovarnaya\n"
-                        "Stop Biryulyovo Tovarnaya: 55.592028, 37.653656, 1300m to Biryulyovo Passazhirskaya\n"
-                        "Stop Biryulyovo Passazhirskaya: 55.580999, 37.659164, 1200m to Biryulyovo Zapadnoye\n"
-                        "Bus 828: Biryulyovo Zapadnoye > Universam > Rossoshanskaya ulitsa > Biryulyovo Zapadnoye\n"
-                        "Stop Rossoshanskaya ulitsa: 55.595579, 37.605757\n"
-                        "Stop Prazhskaya: 55.611678, 37.603831\n"
-                        "6\n"
-                        "Bus 256\n"
-                        "Bus 750\n"
-                        "Bus 751\n"
-                        "Stop Samara\n"
-                        "Stop Prazhskaya\n"
-                        "Stop Biryulyovo Zapadnoye\n");
-    const auto update_requests = ReadRequests(input);
-    const auto read_requests = ReadRequests(input);
-    ASSERT_EQUAL(update_requests.size(), 13u);
-    ASSERT_EQUAL(read_requests.size(), 6u);
-
-    Server manager;
-    vector<ResponsePtr> update_responses = ProcessRequests(manager, update_requests);
-    vector<ResponsePtr> read_responses = ProcessRequests(manager, read_requests);
-    ASSERT_EQUAL(update_responses.size(), 0u);
-    ASSERT_EQUAL(read_responses.size(), 6u);
-
-    ostringstream output;
-    PrintResponces(read_responses, output);
-    ASSERT_EQUAL(output.str(), "Bus 256: 6 stops on route, 5 unique stops, 5950 route length, 1.361239 curvature\n"
-                               "Bus 750: 5 stops on route, 3 unique stops, 27600 route length, 1.318084 curvature\n"
-                               "Bus 751: not found\n"
-                               "Stop Samara: not found\n"
-                               "Stop Prazhskaya: no buses\n"
-                               "Stop Biryulyovo Zapadnoye: buses 256 828\n");
-}
-
 void TestJsonPipeline() {
     ifstream input("tests/input_pipeline_d.json");
     ifstream result("tests/output_pipeline_d.json");
@@ -1009,10 +823,10 @@ void TestJsonPipeline() {
     getline(result, answer);
 
     Document doc = Load(input);
-    const auto requests = ReadJsonRequests(doc.GetRoot());
+    const auto requests = ReadRequests(doc.GetRoot());
     ASSERT_EQUAL(requests.size(), 19u);
 
-    Server manager;
+    TransportManager manager;
     vector<ResponsePtr> responses = ProcessRequests(manager, requests);
     ASSERT_EQUAL(responses.size(), 6u);
 
@@ -1028,10 +842,10 @@ void TestJsonPipelineE_1() {
     getline(result, answer);
 
     Document doc = Load(input);
-    const auto requests = ReadJsonRequests(doc.GetRoot());
+    const auto requests = ReadRequests(doc.GetRoot());
     ASSERT_EQUAL(requests.size(), 12u);
 
-    Server manager;
+    TransportManager manager;
     vector<ResponsePtr> responses = ProcessRequests(manager, requests);
     ASSERT_EQUAL(responses.size(), 5u);
 
@@ -1047,17 +861,16 @@ void TestJsonPipelineE_2() {
     getline(result, answer);
 
     Document doc = Load(input);
-    const auto requests = ReadJsonRequests(doc.GetRoot());
+    const auto requests = ReadRequests(doc.GetRoot());
     ASSERT_EQUAL(requests.size(), 27u);
 
-    Server manager;
+    TransportManager manager;
     vector<ResponsePtr> responses = ProcessRequests(manager, requests);
     ASSERT_EQUAL(responses.size(), 11u);
 
     ostringstream output;
     PrintResponcesInJsonFormat(responses, output);
     ASSERT(CompareResponseJsonStrings(output.str(), answer));
-//    ASSERT_EQUAL(output.str(), answer);
 }
 
 void TestJsonPipelineE_3() {
@@ -1067,17 +880,16 @@ void TestJsonPipelineE_3() {
     getline(result, answer);
 
     Document doc = Load(input);
-    const auto requests = ReadJsonRequests(doc.GetRoot());
+    const auto requests = ReadRequests(doc.GetRoot());
     ASSERT_EQUAL(requests.size(), 10u);
 
-    Server manager;
+    TransportManager manager;
     vector<ResponsePtr> responses = ProcessRequests(manager, requests);
     ASSERT_EQUAL(responses.size(), 4u);
 
     ostringstream output;
     PrintResponcesInJsonFormat(responses, output);
     ASSERT(CompareResponseJsonStrings(output.str(), answer));
-//    ASSERT_EQUAL(output.str(), answer);
 }
 
 void TestJsonPipelineE_4() {
@@ -1090,14 +902,14 @@ void TestJsonPipelineE_4() {
     vector<RequestPtr> requests;
     {
         LOG_DURATION("TestJsonPipelineE_4 ReadRequests");
-        requests = ReadJsonRequests(doc.GetRoot());
+        requests = ReadRequests(doc.GetRoot());
         ASSERT_EQUAL(requests.size(), 2201u);
     }
 
     vector<ResponsePtr> responses;
     {
         LOG_DURATION("TestJsonPipelineE_4 ProcessRequests");
-        Server manager;
+        TransportManager manager;
         responses = ProcessRequests(manager, requests);
         ASSERT_EQUAL(responses.size(), 2000u);
     }
@@ -1111,14 +923,6 @@ void TestJsonPipelineE_4() {
 int main() {
 #ifdef LOCAL_BUILD
     TestRunner tr;
-    RUN_TEST(tr, TestAddBusRequestParseFrom);
-    RUN_TEST(tr, TestAddStopRequestParseFrom);
-    RUN_TEST(tr, TestBusInfoRequestParseFrom);
-    RUN_TEST(tr, TestStopInfoRequestParseFrom);
-    RUN_TEST(tr, TestParseRequest);
-    RUN_TEST(tr, TestReadRequests);
-    RUN_TEST(tr, TestPrintResponse);
-
     RUN_TEST(tr, TestJson);
     RUN_TEST(tr, TestJsonCompare);
     RUN_TEST(tr, TestParseJsonRoutingSettings);
@@ -1140,7 +944,6 @@ int main() {
     RUN_TEST(tr, TestStopManager);
     RUN_TEST(tr, TestRouteManager);
 
-    RUN_TEST(tr, TestPipeline);
     RUN_TEST(tr, TestJsonPipeline);
     RUN_TEST(tr, TestJsonPipelineE_1);
     RUN_TEST(tr, TestJsonPipelineE_2);
@@ -1148,8 +951,8 @@ int main() {
     RUN_TEST(tr, TestJsonPipelineE_4);
 #else
     Document doc = Load(cin);
-    const auto requests = ReadJsonRequests(doc.GetRoot());
-    Server manager;
+    const auto requests = ReadRequests(doc.GetRoot());
+    TransportManager manager;
     vector<ResponsePtr> responses = ProcessRequests(manager, requests);
     PrintResponcesInJsonFormat(responses);
 #endif
