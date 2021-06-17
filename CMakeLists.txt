@@ -6,8 +6,8 @@ project(yandex_belts)
 # Input arguments
 ################################################################################
 
-set(TARGET_COURSE "brown" CACHE STRING "Сhoose course color: white, yellow, red, brown or all")
-set_property(CACHE TARGET_COURSE PROPERTY STRINGS "white" "yellow" "red" "brown" "all")
+set(TARGET_COURSE "brown" CACHE STRING "Сhoose course color: white, yellow, red, brown, black or all")
+set_property(CACHE TARGET_COURSE PROPERTY STRINGS "white" "yellow" "red" "brown" "black" "all")
 set(TARGET_WEEK "week_1" CACHE STRING "Сhoose current week number: week_1, week_2 etc. or all")
 set_property(CACHE TARGET_WEEK PROPERTY STRINGS "week_1" "week_2" "week_3"
                                                 "week_4" "week_5" "week_6" "all")
@@ -20,8 +20,8 @@ message(STATUS "  TARGET_WEEK: ${TARGET_WEEK}")
 # Checking input arguments
 ################################################################################
 
-if (NOT "${TARGET_COURSE}" MATCHES "(white|yellow|red|brown|all)")
-    message(FATAL_ERROR "TARGET_COURSE should be white, yellow, red, brown or all!")
+if (NOT "${TARGET_COURSE}" MATCHES "(white|yellow|red|brown|black|all)")
+    message(FATAL_ERROR "TARGET_COURSE should be white, yellow, red, brown, black or all!")
 endif()
 
 ################################################################################
@@ -54,6 +54,7 @@ if ("${TARGET_COURSE}" MATCHES "all")
     add_subdirectory ("yellow_belt")
     add_subdirectory ("red_belt")
     add_subdirectory ("brown_belt")
+    add_subdirectory ("black_belt")
 else()
     add_subdirectory ("${TARGET_COURSE}_belt")
 endif()

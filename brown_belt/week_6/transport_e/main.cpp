@@ -917,7 +917,6 @@ void TestJsonPipelineE_4() {
     ostringstream output;
     PrintResponcesInJsonFormat(responses, output);
     ASSERT(CompareResponseJsonStrings(output.str(), answer));
-//    ASSERT_EQUAL(output.str(), answer);
 }
 
 int main() {
