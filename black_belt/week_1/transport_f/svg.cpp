@@ -22,23 +22,13 @@ struct Rgb
     uint8_t blue = 0;
 };
 
-struct Color
-{
-    Color() = default;
-    Color(const char* color);
-    Color(std::string color);
-    Color(Rgb color);
+using Color = variant<monostate, string, Rgb>;
+const Color NoneColor{};
 
-    std::string text = "none";
-};
-const Color NoneColor;
-
-std::ostream& operator << (std::ostream& os, const Point& c);
-std::ostream& operator << (std::ostream& os, const Rgb& c);
-std::ostream& operator << (std::ostream& os, const Color& c);
-bool operator == (const Point& lhs, const Point& rhs);
-bool operator == (const Rgb& lhs, const Rgb& rhs);
-bool operator == (const Color& lhs, const Color& rhs);
+void RenderColor(ostream& out, monostate);
+void RenderColor(ostream& out, const string& value);
+void RenderColor(ostream& out, Rgb rgb);
+std::ostream& operator <<(std::ostream& out, const Color& color);
 
 class ObjectBase
 {
@@ -125,29 +115,25 @@ private:
 /// Color methods
 /////////////////////////////////////////////////////////////
 
-Color::Color(const char* color)
-{
-    text = std::string(color);
-}
-Color::Color(std::string color)
-{
-    text = move(color);
-}
-Color::Color(Rgb color)
-{
-    text = "rgb(" + std::to_string(color.red) + "," +
-                    std::to_string(color.green) + "," +
-                    std::to_string(color.blue) + ")";
+void RenderColor(ostream& out, monostate) {
+    out << "none";
 }
 
-std::ostream& operator << (std::ostream& os, const Color& c)
-{
-    return os << c.text;
+void RenderColor(ostream& out, const string& value) {
+    out << value;
 }
 
-bool operator == (const Color& lhs, const Color& rhs)
-{
-    return lhs.text == rhs.text;
+void RenderColor(ostream& out, Rgb rgb) {
+    out << "rgb(" << static_cast<int>(rgb.red)   << ","
+                  << static_cast<int>(rgb.green) << ","
+                  << static_cast<int>(rgb.blue)  << ")";
+}
+
+std::ostream& operator <<(std::ostream& out, const Color& color) {
+    visit([&out](const auto& value) {
+        RenderColor(out, value);
+    }, color);
+    return out;
 }
 
 /////////////////////////////////////////////////////////////
@@ -384,19 +370,19 @@ void TestRgb() {
 }
 void TestColor() {
     {
-        ASSERT_EQUAL(Svg::NoneColor.text, "none");
+        ostringstream output;
+        output << Svg::NoneColor;
+        ASSERT_EQUAL(output.str(), "none");
     }
     {
-        Svg::Color c("white");
-        ASSERT_EQUAL(c.text, "white");
+        ostringstream output;
+        output << Svg::Color("white");
+        ASSERT_EQUAL(output.str(), "white");
     }
     {
-        Svg::Color c(string("black"));
-        ASSERT_EQUAL(c.text, "black");
-    }
-    {
-        Svg::Color c(Svg::Rgb{255, 255, 255});
-        ASSERT_EQUAL(c.text, "rgb(255,255,255)");
+        ostringstream output;
+        output << Svg::Color(Svg::Rgb{255, 255, 255});
+        ASSERT_EQUAL(output.str(), "rgb(255,255,255)");
     }
 }
 
