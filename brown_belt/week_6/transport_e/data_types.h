@@ -98,11 +98,6 @@ struct PathHasher {
 };
 
 struct RoutingSettings {
-//    RoutingSettings() {}
-//    RoutingSettings(int wait_time, double velocity)
-//        : bus_wait_time(wait_time)
-//        , bus_velocity(velocity * 50.0 / 3)
-//    {}
     int bus_wait_time = 0;
     double bus_velocity = 0;
 };
